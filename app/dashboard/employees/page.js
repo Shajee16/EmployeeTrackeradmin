@@ -402,7 +402,172 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {/* Edit/Create/Dept modals simplified or omitted for brevity since user wanted Activity popup primarily */}
+      {/* ═══════ CREATE EMPLOYEE MODAL ═══════ */}
+      <AnimatePresence>
+        {showCreate && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setShowCreate(false)}>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="card" style={{ width: 520, maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg)', padding: 0 }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontWeight: 700, fontSize: '1.2rem', margin: 0 }}>Add New Employee</h3>
+                <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
+              </div>
+              <form onSubmit={handleCreate} style={{ padding: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Full Name *</label>
+                    <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required placeholder="John Doe" style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Email *</label>
+                    <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required placeholder="john@company.com" style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Password *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => setForm({...form, password: e.target.value})} required placeholder="Min 4 characters" style={{ width: '100%', padding: '10px 14px', paddingRight: 40, borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Department *</label>
+                    <select value={form.department} onChange={e => setForm({...form, department: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                      {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Role</label>
+                    <select value={form.role} onChange={e => setForm({...form, role: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                      <option value="Employee">Employee</option>
+                      <option value="Sales Executive">Sales Executive</option>
+                      <option value="Sales Manager">Sales Manager</option>
+                      <option value="Senior Sales Executive">Senior Sales Executive</option>
+                      <option value="Marketing Executive">Marketing Executive</option>
+                      <option value="Team Lead">Team Lead</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Designation</label>
+                    <input value={form.designation} onChange={e => setForm({...form, designation: e.target.value})} placeholder="e.g. Junior Developer" style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Phone</label>
+                    <input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="+91 98765 43210" style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary"><Check size={16} /> Create Employee</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════ EDIT EMPLOYEE MODAL ═══════ */}
+      <AnimatePresence>
+        {editModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setEditModal(null)}>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="card" style={{ width: 520, maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg)', padding: 0 }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontWeight: 700, fontSize: '1.2rem', margin: 0 }}>Edit — {editModal.name}</h3>
+                <button onClick={() => setEditModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
+              </div>
+              <form onSubmit={handleEdit} style={{ padding: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Full Name</label>
+                    <input value={editForm.name || ''} onChange={e => setEditForm({...editForm, name: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Email</label>
+                    <input type="email" value={editForm.email || ''} onChange={e => setEditForm({...editForm, email: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Department</label>
+                    <select value={editForm.department || ''} onChange={e => setEditForm({...editForm, department: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                      {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Role</label>
+                    <select value={editForm.role || ''} onChange={e => setEditForm({...editForm, role: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                      <option value="Employee">Employee</option>
+                      <option value="Sales Executive">Sales Executive</option>
+                      <option value="Sales Manager">Sales Manager</option>
+                      <option value="Senior Sales Executive">Senior Sales Executive</option>
+                      <option value="Marketing Executive">Marketing Executive</option>
+                      <option value="Team Lead">Team Lead</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Designation</label>
+                    <input value={editForm.designation || ''} onChange={e => setEditForm({...editForm, designation: e.target.value})} placeholder="e.g. Sales Manager" style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Phone</label>
+                    <input value={editForm.phone || ''} onChange={e => setEditForm({...editForm, phone: e.target.value})} placeholder="+91 98765 43210" style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Status</label>
+                  <select value={editForm.status || 'active'} onChange={e => setEditForm({...editForm, status: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                    <option value="active">Active</option>
+                    <option value="away">Away</option>
+                  </select>
+                </div>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>New Password (leave blank to keep current)</label>
+                  <input type="password" value={editForm.newPassword || ''} onChange={e => setEditForm({...editForm, newPassword: e.target.value})} placeholder="Enter new password..." style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                </div>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setEditModal(null)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary"><Check size={16} /> Save Changes</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════ MANAGE DEPARTMENTS MODAL ═══════ */}
+      <AnimatePresence>
+        {showDeptModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setShowDeptModal(false)}>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="card" style={{ width: 440, maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg)', padding: 0 }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontWeight: 700, fontSize: '1.2rem', margin: 0 }}>Manage Departments</h3>
+                <button onClick={() => setShowDeptModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
+              </div>
+              <div style={{ padding: 24 }}>
+                <form onSubmit={handleAddDept} style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                  <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)} placeholder="New department name..." required style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                  <button type="submit" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>+ Add</button>
+                </form>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {savedDepartments.map(d => (
+                    <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
+                      <span style={{ fontWeight: 600 }}>{d.name}</span>
+                      <button onClick={() => handleDelDept(d.id)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', cursor: 'pointer', padding: '4px 10px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 600 }}>Delete</button>
+                    </div>
+                  ))}
+                  {savedDepartments.length === 0 && <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>No departments yet</p>}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
