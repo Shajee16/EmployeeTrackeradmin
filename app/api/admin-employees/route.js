@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server';
 import { readData, writeData } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 import bcrypt from 'bcryptjs';
 
+// Auth guard: rejects unauthenticated requests
+async function requireAuth() {
+  const session = await getSession();
+  if (!session) {
+    return { error: true, response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
+  }
+  return { error: false, session };
+}
+
 export async function GET() {
+  const auth = await requireAuth();
+  if (auth.error) return auth.response;
+
   const users = await readData('users');
   // strip passwords
   const sanitized = users.map(({ password, ...u }) => u);
@@ -11,6 +24,9 @@ export async function GET() {
 }
 
 export async function POST(req) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.response;
+
   const body = await req.json();
   const users = await readData('users');
   
@@ -45,6 +61,9 @@ export async function POST(req) {
 }
 
 export async function PUT(req) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.response;
+
   const body = await req.json();
   const users = await readData('users');
   const idx = users.findIndex(u => u.id === body.id);
@@ -71,6 +90,9 @@ export async function PUT(req) {
 }
 
 export async function DELETE(req) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.response;
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   const users = await readData('users');

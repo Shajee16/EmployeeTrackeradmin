@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { readData, writeData } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const suggestions = await readData('suggestions');
   const users = await readData('users');
 
@@ -15,6 +19,9 @@ export async function GET() {
 }
 
 export async function PUT(req) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const body = await req.json();
   const suggestions = await readData('suggestions');
   const idx = suggestions.findIndex(s => s.id === body.id);

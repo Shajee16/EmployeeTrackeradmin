@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { readData, writeData } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const tasks = await readData('tasks');
   const users = await readData('users');
 
@@ -16,6 +20,9 @@ export async function GET() {
 }
 
 export async function POST(req) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const body = await req.json();
   const tasks = await readData('tasks');
 
@@ -38,6 +45,9 @@ export async function POST(req) {
 }
 
 export async function PUT(req) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const body = await req.json();
   const tasks = await readData('tasks');
   const idx = tasks.findIndex(t => t.id === body.id);
@@ -61,6 +71,9 @@ export async function PUT(req) {
 }
 
 export async function DELETE(req) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   const tasks = await readData('tasks');

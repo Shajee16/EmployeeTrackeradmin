@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 
 // GET: Fetch all leave applications for admin review
 export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const db = await getDb();
   const leaves = await db.collection('leaves').find({}).sort({ appliedAt: -1 }).toArray();
   return NextResponse.json({
@@ -12,6 +16,9 @@ export async function GET() {
 
 // PUT: Approve or reject a leave application
 export async function PUT(req) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const body = await req.json();
   const { leaveId, action, adminComments } = body;
 

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 
 // One-time cleanup: remove duplicate documents from all collections
 export async function POST() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const db = await getDb();
   // Map collection name → the field to use as unique key
   const collections = {
