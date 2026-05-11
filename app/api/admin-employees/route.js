@@ -18,13 +18,58 @@ async function requireAdmin() {
   return { error: false, session };
 }
 
+import { getDb } from '@/lib/db';
+
 export async function GET() {
   const auth = await requireAdmin();
   if (auth.error) return auth.response;
 
-  const users = await readData('users');
-  // strip passwords
-  const sanitized = users.map(({ password, ...u }) => u);
+  const db = await getDb();
+  const usersCol = db.collection('users');
+  const users = await usersCol.find({}).toArray();
+
+  // Deduplicate by email
+  const uniqueUsers = [];
+  const seenEmails = new Set();
+  const toDelete = [];
+  
+  for (const u of users) {
+    if (seenEmails.has(u.email.toLowerCase())) {
+      toDelete.push(u._id);
+    } else {
+      seenEmails.add(u.email.toLowerCase());
+      uniqueUsers.push(u);
+    }
+  }
+  
+  if (toDelete.length > 0) {
+    await usersCol.deleteMany({ _id: { $in: toDelete } });
+  }
+  
+  // Reassign IDs
+  const deptCounts = {};
+  for (const u of uniqueUsers) {
+    const dept = u.department || 'Other';
+    const abbrev = dept.substring(0, 3).toUpperCase();
+    if (!deptCounts[abbrev]) deptCounts[abbrev] = 0;
+    deptCounts[abbrev]++;
+    
+    const newId = `CL${abbrev}${String(deptCounts[abbrev]).padStart(3, '0')}`;
+    
+    const oldId = u.id;
+    if (oldId !== newId) {
+      await usersCol.updateOne({ _id: u._id }, { $set: { id: newId } });
+      u.id = newId;
+      // Update references
+      await db.collection('leads').updateMany({ userId: oldId }, { $set: { userId: newId } });
+      await db.collection('followups').updateMany({ userId: oldId }, { $set: { userId: newId } });
+      await db.collection('attendance').updateMany({ userId: oldId }, { $set: { userId: newId } });
+      await db.collection('emails').updateMany({ userId: oldId }, { $set: { userId: newId } });
+      await db.collection('timesessions').updateMany({ userId: oldId }, { $set: { userId: newId } });
+    }
+  }
+
+  const sanitized = uniqueUsers.map(({ password, _id, ...u }) => u);
   return NextResponse.json({ employees: sanitized });
 }
 
@@ -56,9 +101,23 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Email already exists' }, { status: 400 });
   }
 
+  const deptName = sanitizeString(body.department || 'Sales', 50);
+  const abbrev = deptName.substring(0, 3).toUpperCase();
+  const deptUsers = users.filter(u => u.department === deptName && u.id && u.id.startsWith(`CL${abbrev}`));
+  
+  let maxNum = 0;
+  for (const u of deptUsers) {
+    const numMatch = u.id.match(/\d+$/);
+    if (numMatch) {
+      const num = parseInt(numMatch[0], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  const customId = `CL${abbrev}${String(maxNum + 1).padStart(3, '0')}`;
+
   const hashedPassword = await bcrypt.hash(sanitizeString(body.password, 128), 10);
   const newUser = {
-    id: `u${Date.now()}-${uuid().substring(0,4)}`,
+    id: customId,
     name: sanitizeString(body.name, 100),
     email: sanitizeString(body.email, 254).toLowerCase(),
     password: hashedPassword,
