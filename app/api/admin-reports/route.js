@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { readData } from '@/lib/db';
+import { readData, writeData } from '@/lib/db';
 
 export async function GET() {
   const submissions = await readData('submissions');
   const users = await readData('users');
-  
+
   // Attach user names to submissions
   const enhanced = submissions.map(s => {
     const u = users.find(user => user.id === s.userId);
@@ -12,7 +12,22 @@ export async function GET() {
   });
 
   // Sort by latest first
-  enhanced.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  enhanced.sort((a, b) => new Date(b.submittedAt || b.timestamp || 0) - new Date(a.submittedAt || a.timestamp || 0));
 
   return NextResponse.json({ reports: enhanced });
+}
+
+export async function PUT(req) {
+  const body = await req.json();
+  const submissions = await readData('submissions');
+  const idx = submissions.findIndex(s => s.id === body.id);
+
+  if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  if (body.status) submissions[idx].status = body.status;
+  if (body.adminComments !== undefined) submissions[idx].adminComments = body.adminComments;
+  submissions[idx].reviewedAt = new Date().toISOString();
+
+  await writeData('submissions', submissions);
+  return NextResponse.json({ report: submissions[idx] });
 }

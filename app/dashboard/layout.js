@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, createContext, useContext } from 'react';
-import { ShieldAlert, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search } from 'lucide-react';
+import { ShieldAlert, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const ThemeContext = createContext(null);
@@ -10,11 +10,13 @@ export const useTheme = () => useContext(ThemeContext);
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-  { icon: Layers, label: 'Departments', path: '/dashboard/departments' },
   { icon: Users, label: 'Employees', path: '/dashboard/employees' },
+  { icon: Layers, label: 'Departments', path: '/dashboard/departments' },
   { icon: Target, label: 'Lead Management', path: '/dashboard/leads' },
-  { icon: FileText, label: 'Reports', path: '/dashboard/reports' },
-  { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
+  { icon: ClipboardList, label: 'Task Management', path: '/dashboard/tasks' },
+  { icon: FileText, label: 'Submissions', path: '/dashboard/reports' },
+  { icon: CalendarCheck, label: 'Attendance', path: '/dashboard/attendance' },
+  { icon: MessageSquare, label: 'Suggestions', path: '/dashboard/suggestions' },
 ];
 
 export default function DashboardLayout({ children }) {

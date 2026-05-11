@@ -14,27 +14,34 @@ export async function POST(req) {
   const body = await req.json();
   const users = await readData('users');
   
-  if (users.find(u => u.email === body.email)) {
+  if (!body.name || !body.email || !body.password) {
+    return NextResponse.json({ error: 'Name, email, and password are required' }, { status: 400 });
+  }
+
+  if (users.find(u => u.email.toLowerCase() === body.email.toLowerCase())) {
     return NextResponse.json({ error: 'Email already exists' }, { status: 400 });
   }
 
   const hashedPassword = await bcrypt.hash(body.password, 10);
   const newUser = {
-    id: `u${users.length + 1}-${uuid().substring(0,4)}`,
+    id: `u${Date.now()}-${uuid().substring(0,4)}`,
     name: body.name,
     email: body.email,
     password: hashedPassword,
-    role: body.role || 'Operative',
-    department: body.department,
+    role: body.role || 'Employee',
+    department: body.department || 'Sales',
+    designation: body.designation || '',
+    phone: body.phone || '',
     status: 'active',
-    theme: 'system'
+    theme: 'system',
+    joinedAt: new Date().toISOString(),
   };
 
   users.push(newUser);
   await writeData('users', users);
   
   const { password, ...sanitized } = newUser;
-  return NextResponse.json({ employee: sanitized });
+  return NextResponse.json({ employee: sanitized, success: true });
 }
 
 export async function PUT(req) {
@@ -45,12 +52,22 @@ export async function PUT(req) {
   if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   
   if (body.action === 'toggle_status') {
-    users[idx].status = users[idx].status === 'active' ? 'away' : 'active';
+    users[idx].status = users[idx].status === 'away' ? 'active' : 'away';
+  }
+
+  // Support editing other fields
+  if (body.name !== undefined) users[idx].name = body.name;
+  if (body.department !== undefined) users[idx].department = body.department;
+  if (body.role !== undefined) users[idx].role = body.role;
+  if (body.designation !== undefined) users[idx].designation = body.designation;
+  if (body.phone !== undefined) users[idx].phone = body.phone;
+  if (body.newPassword) {
+    users[idx].password = await bcrypt.hash(body.newPassword, 10);
   }
 
   await writeData('users', users);
   const { password, ...sanitized } = users[idx];
-  return NextResponse.json({ employee: sanitized });
+  return NextResponse.json({ employee: sanitized, success: true });
 }
 
 export async function DELETE(req) {
