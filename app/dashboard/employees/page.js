@@ -5,6 +5,9 @@ import { Search, UserX, Power, UserPlus, Edit, Eye, EyeOff, X, Check, AlertCircl
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState([]);
+  const [savedDepartments, setSavedDepartments] = useState([]);
+  const [showDeptModal, setShowDeptModal] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -17,11 +20,12 @@ export default function EmployeesPage() {
 
   const load = () => {
     fetch('/api/admin-employees').then(r => r.json()).then(d => setEmployees(d.employees || []));
+    fetch('/api/admin-departments').then(r => r.json()).then(d => setSavedDepartments(d.departments || []));
   };
 
   useEffect(() => { load(); }, []);
 
-  const departments = [...new Set(employees.map(e => e.department).filter(Boolean))];
+  const departments = savedDepartments.map(d => d.name);
 
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
@@ -35,6 +39,27 @@ export default function EmployeesPage() {
   const showMsg = (msg, isError = false) => {
     if (isError) { setError(msg); setTimeout(() => setError(''), 4000); }
     else { setSuccess(msg); setTimeout(() => setSuccess(''), 4000); }
+  };
+
+  const handleAddDept = async (e) => {
+    e.preventDefault();
+    const res = await fetch('/api/admin-departments', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newDeptName })
+    });
+    const data = await res.json();
+    if (!res.ok) { showMsg(data.error || 'Failed to add department', true); return; }
+    setNewDeptName('');
+    showMsg('Department added');
+    load();
+  };
+
+  const handleDelDept = async (id, name) => {
+    if (!confirm(`Delete department "${name}"?`)) return;
+    const res = await fetch(`/api/admin-departments?id=${id}`, { method: 'DELETE' });
+    if (!res.ok) { showMsg('Failed to delete department', true); return; }
+    showMsg('Department deleted');
+    load();
   };
 
   const handleCreate = async (e) => {
@@ -142,15 +167,11 @@ export default function EmployeesPage() {
                 </div>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Department *</label>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  Department * <button type="button" onClick={() => setShowDeptModal(true)} style={{ color: 'var(--primary)', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.7rem' }}>(Manage)</button>
+                </label>
                 <select value={form.department} onChange={e => setForm({...form, department: e.target.value})}>
-                  <option value="Sales">Sales</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Operations">Operations</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="HR">HR</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Support">Support</option>
+                  {savedDepartments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                 </select>
               </div>
               <div>
@@ -274,11 +295,11 @@ export default function EmployeesPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Department</label>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                    Department <button type="button" onClick={() => setShowDeptModal(true)} style={{ color: 'var(--primary)', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.7rem' }}>(Manage)</button>
+                  </label>
                   <select value={editForm.department} onChange={e => setEditForm({...editForm, department: e.target.value})}>
-                    <option value="Sales">Sales</option><option value="Marketing">Marketing</option>
-                    <option value="Operations">Operations</option><option value="Engineering">Engineering</option>
-                    <option value="HR">HR</option><option value="Finance">Finance</option><option value="Support">Support</option>
+                    {savedDepartments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -307,6 +328,37 @@ export default function EmployeesPage() {
               <button type="submit" className="btn btn-primary">Save Changes</button>
             </div>
           </motion.form>
+        </div>
+      )}
+
+      {/* Department Management Modal */}
+      {showDeptModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110 }} onClick={() => setShowDeptModal(false)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="card" style={{ padding: 24, width: 400, maxHeight: '80vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Manage Departments</h3>
+              <button type="button" onClick={() => setShowDeptModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+            </div>
+            
+            <form onSubmit={handleAddDept} style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)} placeholder="New department name" style={{ flex: 1 }} required />
+              <button type="submit" className="btn btn-primary">Add</button>
+            </form>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {savedDepartments.map(d => (
+                <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{d.name}</span>
+                  <button type="button" onClick={() => handleDelDept(d.id, d.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', alignItems: 'center' }}>
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+              {savedDepartments.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No departments found.</p>}
+            </div>
+          </motion.div>
         </div>
       )}
     </motion.div>

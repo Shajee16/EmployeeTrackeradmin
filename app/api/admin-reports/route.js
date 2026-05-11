@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { readData, writeData } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { sanitizeInput, sanitizeString, isOneOf } from '@/lib/sanitize';
+import { logAdminAction } from '@/lib/audit';
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (session.role !== 'System Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const submissions = await readData('submissions');
   const users = await readData('users');
@@ -24,17 +27,37 @@ export async function GET() {
 export async function PUT(req) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (session.role !== 'System Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const body = await req.json();
+  let body;
+  try {
+    body = sanitizeInput(await req.json());
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
   const submissions = await readData('submissions');
   const idx = submissions.findIndex(s => s.id === body.id);
 
   if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  if (body.status) submissions[idx].status = body.status;
-  if (body.adminComments !== undefined) submissions[idx].adminComments = body.adminComments;
+  const before = { status: submissions[idx].status };
+
+  if (body.status && isOneOf(body.status, ['Submitted', 'Pending', 'Reviewed', 'Approved', 'Rejected'])) {
+    submissions[idx].status = body.status;
+  }
+  if (body.adminComments !== undefined) {
+    submissions[idx].adminComments = sanitizeString(body.adminComments, 1000);
+  }
   submissions[idx].reviewedAt = new Date().toISOString();
+  submissions[idx].reviewedBy = session.email || session.id;
 
   await writeData('submissions', submissions);
+
+  await logAdminAction(session, 'REVIEW_REPORT', 'submission', body.id, {
+    before,
+    after: { status: submissions[idx].status },
+  });
+
   return NextResponse.json({ report: submissions[idx] });
 }

@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { logAdminAction } from '@/lib/audit';
 
 // One-time cleanup: remove duplicate documents from all collections
 export async function POST() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (session.role !== 'System Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const db = await getDb();
   // Map collection name → the field to use as unique key
@@ -46,6 +48,9 @@ export async function POST() {
     const remaining = await col.countDocuments();
     report[colName] = { before: all.length, duplicatesRemoved: duplicateIds.length, after: remaining };
   }
+
+  // Audit log
+  await logAdminAction(session, 'DATABASE_CLEANUP', 'system', 'all_collections', { report });
 
   return NextResponse.json({ success: true, report });
 }

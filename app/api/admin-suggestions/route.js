@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { readData, writeData } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { sanitizeInput, sanitizeString, isOneOf } from '@/lib/sanitize';
+import { logAdminAction } from '@/lib/audit';
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (session.role !== 'System Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const suggestions = await readData('suggestions');
   const users = await readData('users');
@@ -21,17 +24,37 @@ export async function GET() {
 export async function PUT(req) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (session.role !== 'System Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const body = await req.json();
+  let body;
+  try {
+    body = sanitizeInput(await req.json());
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
   const suggestions = await readData('suggestions');
   const idx = suggestions.findIndex(s => s.id === body.id);
 
   if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  if (body.status) suggestions[idx].status = body.status;
-  if (body.adminReply !== undefined) suggestions[idx].adminReply = body.adminReply;
+  const before = { status: suggestions[idx].status };
+
+  if (body.status && isOneOf(body.status, ['Pending', 'Reviewed', 'Implemented', 'Dismissed'])) {
+    suggestions[idx].status = body.status;
+  }
+  if (body.adminReply !== undefined) {
+    suggestions[idx].adminReply = sanitizeString(body.adminReply, 1000);
+  }
   suggestions[idx].reviewedAt = new Date().toISOString();
+  suggestions[idx].reviewedBy = session.email || session.id;
 
   await writeData('suggestions', suggestions);
+
+  await logAdminAction(session, 'REVIEW_SUGGESTION', 'suggestion', body.id, {
+    before,
+    after: { status: suggestions[idx].status },
+  });
+
   return NextResponse.json({ suggestion: suggestions[idx] });
 }
