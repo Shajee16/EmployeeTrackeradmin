@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Strategic Command Center',
+  title: 'Cluso CRM Admin Portal',
   description: 'Admin Operational Cockpit',
 };
 

@@ -68,7 +68,7 @@ export default function DashboardLayout({ children }) {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 40, height: 40, border: '3px solid var(--surface-border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-        <p style={{ color: 'var(--text-muted)' }}>Loading Nexus CRM...</p>
+        <p style={{ color: 'var(--text-muted)' }}>Loading Cluso CRM...</p>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
@@ -90,10 +90,10 @@ export default function DashboardLayout({ children }) {
         }} className="md-sidebar">
           {/* Logo */}
           <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--sidebar-border)' }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 10L9 13L14 7" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+              <img src="/logo.png" alt="Logo" style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
             </div>
-            <span style={{ color: 'var(--text)', fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Nexus CRM</span>
+            <span style={{ color: 'var(--text)', fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Cluso Admin</span>
           </div>
 
           <div style={{ padding: '24px 16px 8px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

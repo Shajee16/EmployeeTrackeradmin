@@ -31,9 +31,9 @@ export default function Login() {
       <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5 }} 
         style={{ width: 400, padding: 40, zIndex: 20, position: 'relative', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 24, boxShadow: '0 10px 25px rgba(0, 0, 0, 0.05)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
-          <ShieldAlert size={48} color="#6366f1" style={{ marginBottom: 16 }} />
-          <h1 style={{ fontSize: '1.2rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center', color: '#0f172a' }}>Strategic Command</h1>
-          <p style={{ fontSize: '0.7rem', color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4 }}>Level 5 Clearance Required</p>
+          <img src="/logo.png" alt="Cluso CRM Logo" style={{ height: '60px', objectFit: 'contain', marginBottom: 16 }} />
+          <h1 style={{ fontSize: '1.2rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center', color: '#0f172a' }}>Cluso CRM Admin Portal</h1>
+          <p style={{ fontSize: '0.7rem', color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4 }}>Administrator Access</p>
         </div>
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
