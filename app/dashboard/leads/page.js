@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Search, Phone, Mail, DollarSign, Users, TrendingUp, ChevronDown, ChevronRight, MessageSquare, Send } from 'lucide-react';
+import { Target, Search, Phone, Mail, DollarSign, Users, TrendingUp, ChevronDown, ChevronRight, MessageSquare, Send, RefreshCw } from 'lucide-react';
 
 export default function LeadManagement() {
   const [leads, setLeads] = useState([]);
@@ -338,10 +338,13 @@ export default function LeadManagement() {
 
               {/* Right Col: Conversations & Reply */}
               <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
-                <div style={{ padding: '16px 24px', background: 'var(--surface)', borderBottom: '1px solid var(--surface-border)' }}>
+                <div style={{ padding: '16px 24px', background: 'var(--surface)', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <MessageSquare size={16}/> Email Conversations
                   </h4>
+                  <button onClick={loadData} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8rem', fontWeight: 600 }}>
+                    <RefreshCw size={14} /> Refresh
+                  </button>
                 </div>
                 
                 <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
