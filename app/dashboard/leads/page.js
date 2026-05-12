@@ -19,10 +19,11 @@ export default function LeadManagement() {
 
   const loadData = async () => {
     try {
+      const ts = Date.now();
       const [leadsRes, empsRes, emailsRes] = await Promise.all([
-        fetch('/api/admin-leads').then(r => r.json()),
-        fetch('/api/admin-employees').then(r => r.json()),
-        fetch('/api/admin-leads/emails').then(r => r.json())
+        fetch(`/api/admin-leads?t=${ts}`).then(r => r.json()),
+        fetch(`/api/admin-employees?t=${ts}`).then(r => r.json()),
+        fetch(`/api/admin-leads/emails?t=${ts}`).then(r => r.json())
       ]);
       setLeads(leadsRes.leads || []);
       setEmployees(empsRes.employees || []);
@@ -114,7 +115,7 @@ export default function LeadManagement() {
     
     return [...leadSent.map(e => ({ ...e, isReply: false, date: new Date(e.sentAt) })), 
             ...leadReplies.map(r => ({ ...r, isReply: true, date: new Date(r.receivedAt) }))]
-            .sort((a, b) => b.date - a.date);
+            .sort((a, b) => a.date - b.date); // Sort ascending so newest is at the bottom
   };
 
   return (
