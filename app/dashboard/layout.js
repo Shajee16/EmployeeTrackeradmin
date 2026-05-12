@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, createContext, useContext } from 'react';
-import { ShieldAlert, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import logoImg from '../logo.png';
 
@@ -14,10 +14,14 @@ const navItems = [
   { icon: Users, label: 'Employees', path: '/dashboard/employees' },
   { icon: Layers, label: 'Departments', path: '/dashboard/departments' },
   { icon: Target, label: 'Lead Management', path: '/dashboard/leads' },
+  { icon: PlusCircle, label: 'Add Leads', path: '/dashboard/add-leads' },
   { icon: ClipboardList, label: 'Task Management', path: '/dashboard/tasks' },
   { icon: FileText, label: 'Submissions', path: '/dashboard/reports' },
   { icon: CalendarCheck, label: 'Attendance', path: '/dashboard/attendance' },
   { icon: MessageSquare, label: 'Suggestions', path: '/dashboard/suggestions' },
+  { icon: Bell, label: 'Notifications', path: '/dashboard/notifications' },
+  { icon: ShieldCheck, label: 'Admin Management', path: '/dashboard/admin-management', superOnly: true },
+  { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
 ];
 
 export default function DashboardLayout({ children }) {
@@ -28,6 +32,7 @@ export default function DashboardLayout({ children }) {
   const [themeMode, setThemeMode] = useState('dark');
   const [themeColor, setThemeColor] = useState('beige');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
@@ -35,6 +40,10 @@ export default function DashboardLayout({ children }) {
       else {
         setUser(d.user);
         setLoading(false);
+        // Load notification count
+        fetch('/api/admin-notifications').then(r => r.json()).then(nd => {
+          setUnreadCount((nd.notifications || []).filter(n => !n.read).length);
+        }).catch(() => {});
       }
     }).catch(() => router.push('/login'));
     // Default to dark beige theme but let it be toggled
@@ -102,7 +111,7 @@ export default function DashboardLayout({ children }) {
           </div>
 
           <nav style={{ flex: 1, padding: '0 12px', overflowY: 'auto' }}>
-            {navItems.map((item) => {
+            {navItems.filter(item => !item.superOnly || user?.role === 'Super Admin').map((item) => {
               const active = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(item.path));
               return (
                 <Link key={item.path} href={item.path} onClick={() => setMobileOpen(false)} style={{
@@ -182,20 +191,20 @@ export default function DashboardLayout({ children }) {
                 ))}
               </div>
               
-              <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', position: 'relative', cursor: 'pointer' }}>
+              <button onClick={() => router.push('/dashboard/notifications')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', position: 'relative', cursor: 'pointer' }}>
                 <Bell size={20} />
-                <span style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: 'var(--danger)' }}></span>
+                {unreadCount > 0 && <span style={{ position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: '50%', background: 'var(--danger)', color: '#fff', fontSize: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
               </button>
 
               <div style={{ height: 32, width: 1, background: 'var(--surface-border)' }} />
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ textAlign: 'right', display: 'none' }} className="user-text">
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Admin User</p>
-                  <p style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600 }}>ONLINE</p>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>{user?.name || 'Admin'}</p>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600 }}>{user?.role || 'ADMIN'}</p>
                 </div>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-secondary)', border: '1px solid var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', fontWeight: 700, fontSize: '0.9rem' }}>
-                  AD
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-secondary)', border: '1px solid var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' }} onClick={() => router.push('/dashboard/settings')}>
+                  {user?.name?.charAt(0) || 'A'}
                 </div>
               </div>
             </div>

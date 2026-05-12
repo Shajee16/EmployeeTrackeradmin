@@ -12,7 +12,7 @@ async function requireAdmin() {
   if (!session) {
     return { error: true, response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
   }
-  if (session.role !== 'System Admin') {
+  if (!['System Admin', 'Super Admin'].includes(session.role)) {
     return { error: true, response: NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 }) };
   }
   return { error: false, session };

@@ -4,6 +4,8 @@ import { cookies } from 'next/headers';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { sanitizeString, isValidEmail } from '@/lib/sanitize';
 import { auditLog } from '@/lib/audit';
+import { readData } from '@/lib/db';
+import bcrypt from 'bcryptjs';
 
 export async function POST(req) {
   // Rate limiting — 10 login attempts per 15-minute window per IP
@@ -40,35 +42,63 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
   }
 
-  if (email === 'admin@nexus.com' && password === 'admin123') {
-    const user = { id: 'admin-001', name: 'Commander', role: 'System Admin', email };
+  // ── Super Admin (hardcoded) ──────────────────────────────────────────────
+  if (email === 'pkumar@cluso.in' && password === 'Cluso@2026') {
+    const user = { id: 'superadmin-001', name: 'P Kumar', role: 'Super Admin', email };
     const token = await createToken(user);
-    
     const c = await cookies();
     c.set('admin_session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/',
-      maxAge: 60 * 60 * 24, // 24 hours
+      maxAge: 60 * 60 * 24,
     });
-
-    await auditLog({
-      action: 'LOGIN_SUCCESS',
-      performedBy: email,
-      performedByRole: 'System Admin',
-      details: { ip },
-    });
-
+    await auditLog({ action: 'LOGIN_SUCCESS', performedBy: email, performedByRole: 'Super Admin', details: { ip } });
     return NextResponse.json({ user });
   }
 
-  await auditLog({
-    action: 'LOGIN_FAILED',
-    performedBy: email,
-    performedByRole: 'unknown',
-    details: { ip },
-  });
+  // ── Legacy hardcoded admin (backward compat) ─────────────────────────────
+  if (email === 'admin@nexus.com' && password === 'admin123') {
+    const user = { id: 'admin-001', name: 'Commander', role: 'System Admin', email };
+    const token = await createToken(user);
+    const c = await cookies();
+    c.set('admin_session', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 60 * 60 * 24,
+    });
+    await auditLog({ action: 'LOGIN_SUCCESS', performedBy: email, performedByRole: 'System Admin', details: { ip } });
+    return NextResponse.json({ user });
+  }
 
-  return NextResponse.json({ error: 'Invalid clearance credentials' }, { status: 401 });
+  // ── DB admins ────────────────────────────────────────────────────────────
+  try {
+    const admins = await readData('admins');
+    const admin = admins.find(a => a.email && a.email.toLowerCase() === email.toLowerCase());
+    if (admin && admin.password) {
+      const match = await bcrypt.compare(password, admin.password);
+      if (match) {
+        const user = { id: admin.id, name: admin.name, role: admin.role || 'System Admin', email: admin.email };
+        const token = await createToken(user);
+        const c = await cookies();
+        c.set('admin_session', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          path: '/',
+          maxAge: 60 * 60 * 24,
+        });
+        await auditLog({ action: 'LOGIN_SUCCESS', performedBy: email, performedByRole: user.role, details: { ip } });
+        return NextResponse.json({ user });
+      }
+    }
+  } catch (e) {
+    // admins collection may not exist yet, ignore
+  }
+
+  await auditLog({ action: 'LOGIN_FAILED', performedBy: email, performedByRole: 'unknown', details: { ip } });
+  return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
 }
