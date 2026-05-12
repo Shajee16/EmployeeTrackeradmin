@@ -42,38 +42,6 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
   }
 
-  // ── Super Admin (hardcoded) ──────────────────────────────────────────────
-  if (email === 'pkumar@cluso.in' && password === 'Cluso@2026') {
-    const user = { id: 'superadmin-001', name: 'P Kumar', role: 'Super Admin', email };
-    const token = await createToken(user);
-    const c = await cookies();
-    c.set('admin_session', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 60 * 60 * 24,
-    });
-    await auditLog({ action: 'LOGIN_SUCCESS', performedBy: email, performedByRole: 'Super Admin', details: { ip } });
-    return NextResponse.json({ user });
-  }
-
-  // ── Legacy hardcoded admin (backward compat) ─────────────────────────────
-  if (email === 'admin@nexus.com' && password === 'admin123') {
-    const user = { id: 'admin-001', name: 'Commander', role: 'System Admin', email };
-    const token = await createToken(user);
-    const c = await cookies();
-    c.set('admin_session', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 60 * 60 * 24,
-    });
-    await auditLog({ action: 'LOGIN_SUCCESS', performedBy: email, performedByRole: 'System Admin', details: { ip } });
-    return NextResponse.json({ user });
-  }
-
   // ── DB admins ────────────────────────────────────────────────────────────
   try {
     const admins = await readData('admins');

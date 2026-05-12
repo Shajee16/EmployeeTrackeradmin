@@ -10,9 +10,12 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setIsLoggingIn(true);
+    setError('');
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -24,6 +27,7 @@ export default function Login() {
     } else {
       const data = await res.json();
       setError(data.error);
+      setIsLoggingIn(false);
     }
   };
 
@@ -50,9 +54,19 @@ export default function Login() {
             <input required type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', padding: '10px 14px', borderRadius: 8 }} />
           </div>
 
-          <button type="submit" style={{ marginTop: 12, width: '100%', padding: '12px', borderRadius: 8, textTransform: 'uppercase', letterSpacing: '0.05em', background: '#0f172a', color: '#ffffff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>AUTHORIZE ACCESS</button>
+          <button type="submit" disabled={isLoggingIn} style={{ marginTop: 12, width: '100%', padding: '12px', borderRadius: 8, textTransform: 'uppercase', letterSpacing: '0.05em', background: '#0f172a', color: '#ffffff', border: 'none', fontWeight: 700, cursor: isLoggingIn ? 'not-allowed' : 'pointer', opacity: isLoggingIn ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            {isLoggingIn ? (
+              <>
+                <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                AUTHORIZING...
+              </>
+            ) : 'AUTHORIZE ACCESS'}
+          </button>
         </form>
       </motion.div>
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+      `}} />
     </div>
   );
 }
