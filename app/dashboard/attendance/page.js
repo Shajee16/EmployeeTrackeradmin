@@ -1,4 +1,5 @@
 'use client';
+import React from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarCheck, Search, ShieldCheck, Clock, CheckCircle, XCircle, ChevronDown, ChevronRight, Building2, Users, CalendarDays } from 'lucide-react';
@@ -23,6 +24,7 @@ export default function AttendancePage() {
   const [actionLoading, setActionLoading] = useState(null);
   const [expandedDepts, setExpandedDepts] = useState({});
   const [expandedEmps, setExpandedEmps] = useState({});
+  const [expandedDays, setExpandedDays] = useState({});
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
   });
@@ -206,22 +208,120 @@ export default function AttendancePage() {
                                           <tbody>
                                             {records.map((r, i) => {
                                               const isWeekend = r.status === 'Weekend';
+                                              const dayKey = `${empKey}-${r.date}`;
+                                              const hasSessions = r.sessions && r.sessions.length > 0;
+                                              const hasActivities = r.activities && r.activities.length > 0;
+                                              const hasDetail = hasSessions || hasActivities;
+                                              const fmtISO = (iso) => iso ? new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
+                                              const fmtSecs = (s) => { const h = Math.floor(s/3600); const m = Math.floor((s%3600)/60); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
+
                                               return (
-                                                <tr key={i} style={{
-                                                  borderBottom: '1px solid var(--surface-border)',
-                                                  opacity: isWeekend ? 0.5 : 1,
-                                                  background: r.date === todayStr ? 'rgba(99,102,241,0.04)' : 'transparent',
-                                                }}>
-                                                  <td style={{ padding: '8px 10px', fontWeight: r.date === todayStr ? 700 : 500 }}>
-                                                    {r.date}{r.date === todayStr && <span style={{ color: 'var(--primary)', fontSize: '0.65rem', marginLeft: 4 }}>TODAY</span>}
-                                                  </td>
-                                                  <td style={{ padding: '8px 10px', color: isWeekend ? '#94a3b8' : 'var(--text)' }}>{getDayName(r.date)}</td>
-                                                  <td style={{ padding: '8px 10px' }}>{r.loginTime || '-'}</td>
-                                                  <td style={{ padding: '8px 10px' }}>{r.logoutTime || '-'}</td>
-                                                  <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.totalHours ? `${r.totalHours}h` : '-'}</td>
-                                                  <td style={{ padding: '8px 10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{r.workMode || '-'}</td>
-                                                  <td style={{ padding: '8px 10px' }}><span style={statusBadge(r.status)}>{r.status}</span></td>
-                                                </tr>
+                                                <React.Fragment key={i}>
+                                                  <tr
+                                                    onClick={() => hasDetail && toggle(setExpandedDays, dayKey)}
+                                                    style={{
+                                                      borderBottom: expandedDays[dayKey] ? 'none' : '1px solid var(--surface-border)',
+                                                      opacity: isWeekend ? 0.5 : 1,
+                                                      background: r.date === todayStr ? 'rgba(99,102,241,0.04)' : 'transparent',
+                                                      cursor: hasDetail ? 'pointer' : 'default',
+                                                    }}>
+                                                    <td style={{ padding: '8px 10px', fontWeight: r.date === todayStr ? 700 : 500 }}>
+                                                      {hasDetail && (expandedDays[dayKey] ? <ChevronDown size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} /> : <ChevronRight size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />)}
+                                                      {r.date}{r.date === todayStr && <span style={{ color: 'var(--primary)', fontSize: '0.65rem', marginLeft: 4 }}>TODAY</span>}
+                                                    </td>
+                                                    <td style={{ padding: '8px 10px', color: isWeekend ? '#94a3b8' : 'var(--text)' }}>{getDayName(r.date)}</td>
+                                                    <td style={{ padding: '8px 10px' }}>{r.loginTime || '-'}</td>
+                                                    <td style={{ padding: '8px 10px' }}>{r.logoutTime || '-'}</td>
+                                                    <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.totalHours ? `${r.totalHours}h` : '-'}</td>
+                                                    <td style={{ padding: '8px 10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{r.workMode || '-'}</td>
+                                                    <td style={{ padding: '8px 10px' }}><span style={statusBadge(r.status)}>{r.status}</span></td>
+                                                  </tr>
+
+                                                  {/* Expanded Detail Row */}
+                                                  {expandedDays[dayKey] && (
+                                                    <tr>
+                                                      <td colSpan={7} style={{ padding: '0 10px 16px 30px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--surface-border)' }}>
+                                                        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 8 }}>
+
+                                                          {/* Sessions & Breaks */}
+                                                          {hasSessions && (
+                                                            <div style={{ flex: '1 1 280px', minWidth: 260 }}>
+                                                              <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: 8 }}>
+                                                                🕐 Sessions & Breaks ({r.sessions.length} session{r.sessions.length > 1 ? 's' : ''})
+                                                              </div>
+                                                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                                {r.sessions.map((sess, si) => {
+                                                                  // Calculate break before this session
+                                                                  let breakBefore = null;
+                                                                  if (si > 0 && r.sessions[si - 1].logoutTime && sess.loginTime) {
+                                                                    const prevOut = new Date(r.sessions[si - 1].logoutTime).getTime();
+                                                                    const curIn = new Date(sess.loginTime).getTime();
+                                                                    const breakSecs = Math.floor((curIn - prevOut) / 1000);
+                                                                    if (breakSecs > 60) breakBefore = breakSecs;
+                                                                  }
+                                                                  return (
+                                                                    <React.Fragment key={si}>
+                                                                      {breakBefore && (
+                                                                        <div style={{
+                                                                          padding: '4px 10px', borderRadius: 6, fontSize: '0.72rem',
+                                                                          background: 'rgba(245,158,11,0.08)', color: '#d97706',
+                                                                          border: '1px dashed rgba(245,158,11,0.3)', textAlign: 'center',
+                                                                        }}>
+                                                                          ☕ Break — {fmtSecs(breakBefore)}
+                                                                        </div>
+                                                                      )}
+                                                                      <div style={{
+                                                                        padding: '8px 12px', borderRadius: 8, fontSize: '0.78rem',
+                                                                        background: 'var(--surface)', border: '1px solid var(--surface-border)',
+                                                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                                      }}>
+                                                                        <div>
+                                                                          <span style={{ fontWeight: 600, color: '#10b981' }}>▶ {fmtISO(sess.loginTime)}</span>
+                                                                          <span style={{ margin: '0 6px', color: 'var(--text-muted)' }}>→</span>
+                                                                          <span style={{ fontWeight: 600, color: '#ef4444' }}>⏹ {fmtISO(sess.logoutTime)}</span>
+                                                                        </div>
+                                                                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                                                                          {fmtSecs(sess.totalSeconds)}
+                                                                        </span>
+                                                                      </div>
+                                                                    </React.Fragment>
+                                                                  );
+                                                                })}
+                                                              </div>
+                                                            </div>
+                                                          )}
+
+                                                          {/* Activity Timeline */}
+                                                          {hasActivities && (
+                                                            <div style={{ flex: '1 1 320px', minWidth: 280 }}>
+                                                              <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: 8 }}>
+                                                                📋 Activity Log ({r.activities.length} actions)
+                                                              </div>
+                                                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 200, overflowY: 'auto' }}>
+                                                                {r.activities.map((act, ai) => (
+                                                                  <div key={ai} style={{
+                                                                    padding: '5px 10px', fontSize: '0.75rem', borderRadius: 6,
+                                                                    background: 'var(--surface)', border: '1px solid var(--surface-border)',
+                                                                    display: 'flex', gap: 8, alignItems: 'flex-start',
+                                                                  }}>
+                                                                    <span style={{ fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                                                      {fmtISO(act.time)}
+                                                                    </span>
+                                                                    <span style={{ color: 'var(--text)', lineHeight: 1.4 }}>{act.action}</span>
+                                                                  </div>
+                                                                ))}
+                                                              </div>
+                                                            </div>
+                                                          )}
+
+                                                          {!hasSessions && !hasActivities && (
+                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No detailed session data available for this day.</div>
+                                                          )}
+                                                        </div>
+                                                      </td>
+                                                    </tr>
+                                                  )}
+                                                </React.Fragment>
                                               );
                                             })}
                                           </tbody>
