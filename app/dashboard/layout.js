@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, createContext, useContext } from 'react';
-import { ShieldAlert, ShieldCheck, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, AlertTriangle, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import logoImg from '../logo.png';
 
@@ -19,6 +19,7 @@ const navItems = [
   { icon: FileText, label: 'Submissions', path: '/dashboard/reports' },
   { icon: CalendarCheck, label: 'Attendance', path: '/dashboard/attendance' },
   { icon: MessageSquare, label: 'Suggestions', path: '/dashboard/suggestions' },
+  { icon: AlertTriangle, label: 'Alerts', path: '/dashboard/alerts' },
   { icon: Bell, label: 'Notifications', path: '/dashboard/notifications' },
   { icon: ShieldCheck, label: 'Admin Management', path: '/dashboard/admin-management', superOnly: true },
   { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
