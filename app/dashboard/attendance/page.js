@@ -1,102 +1,118 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { CalendarCheck, Search, ShieldCheck, ShieldX, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CalendarCheck, Search, ShieldCheck, Clock, CheckCircle, XCircle, ChevronDown, ChevronRight, Building2, Users, CalendarDays } from 'lucide-react';
+
+const statusBadge = (s) => {
+  const map = {
+    Present: { bg: 'rgba(16,185,129,0.1)', color: '#10b981' },
+    'Half Day': { bg: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+    Absent: { bg: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+    'On Leave': { bg: 'rgba(99,102,241,0.1)', color: '#6366f1' },
+    Weekend: { bg: 'rgba(148,163,184,0.08)', color: '#94a3b8' },
+  };
+  const st = map[s] || map.Absent;
+  return { padding: '3px 10px', borderRadius: 50, fontSize: '0.72rem', fontWeight: 700, background: st.bg, color: st.color, display: 'inline-block' };
+};
 
 export default function AttendancePage() {
   const [attendance, setAttendance] = useState([]);
   const [leaves, setLeaves] = useState([]);
-  const [search, setSearch] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [tab, setTab] = useState('attendance'); // 'attendance' | 'leaves'
+  const [tab, setTab] = useState('attendance');
   const [leaveFilter, setLeaveFilter] = useState('Pending');
   const [actionLoading, setActionLoading] = useState(null);
+  const [expandedDepts, setExpandedDepts] = useState({});
+  const [expandedEmps, setExpandedEmps] = useState({});
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
+  });
 
   const fetchData = () => {
     fetch('/api/admin-attendance').then(r => r.json()).then(d => setAttendance(d.attendance || []));
     fetch('/api/admin-leaves').then(r => r.json()).then(d => setLeaves(d.leaves || []));
   };
-
   useEffect(() => { fetchData(); }, []);
 
-  /* ── Attendance filtering ── */
-  const filtered = useMemo(() => {
-    const s = search.toLowerCase();
-    return attendance.filter(a => {
-      const matchSearch = (a.employeeName || '').toLowerCase().includes(s);
-      const matchDate = dateFilter ? a.date === dateFilter : true;
-      const matchStatus = statusFilter ? a.status === statusFilter : true;
-      return matchSearch && matchDate && matchStatus;
-    });
-  }, [attendance, search, dateFilter, statusFilter]);
-
-  /* ── Leave filtering ── */
-  const filteredLeaves = useMemo(() => {
-    return leaves.filter(l => leaveFilter === 'All' || l.status === leaveFilter);
-  }, [leaves, leaveFilter]);
-
-  /* ── Stats ── */
-  const uniqueDates = [...new Set(attendance.map(a => a.date))].sort().reverse();
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayRecords = attendance.filter(a => a.date === todayStr);
-  const todayPresent = todayRecords.filter(a => a.status === 'Present').length;
-  const todayAbsent = todayRecords.filter(a => a.status === 'Absent').length;
+  const todayPresent = attendance.filter(a => a.date === todayStr && a.status === 'Present').length;
+  const todayAbsent = attendance.filter(a => a.date === todayStr && a.status === 'Absent').length;
   const pendingLeaves = leaves.filter(l => l.status === 'Pending').length;
 
-  /* ── Leave approval/rejection ── */
+  // Filter attendance by selected month
+  const monthFiltered = useMemo(() => {
+    return attendance.filter(a => a.date && a.date.startsWith(selectedMonth));
+  }, [attendance, selectedMonth]);
+
+  // Build hierarchy: Department → Employee → sorted dates
+  const grouped = useMemo(() => {
+    const tree = {};
+    monthFiltered.forEach(a => {
+      const dept = a.employeeDept || 'Unknown';
+      const emp = a.employeeName || 'Unknown';
+      if (!tree[dept]) tree[dept] = {};
+      if (!tree[dept][emp]) tree[dept][emp] = [];
+      tree[dept][emp].push(a);
+    });
+    // Sort each employee's records by date descending
+    Object.values(tree).forEach(deptData => {
+      Object.keys(deptData).forEach(emp => {
+        deptData[emp].sort((a, b) => b.date.localeCompare(a.date));
+      });
+    });
+    return tree;
+  }, [monthFiltered]);
+
+  const toggle = (setter, key) => setter(p => ({ ...p, [key]: !p[key] }));
+
+  // Month navigation
+  const months = useMemo(() => {
+    const set = new Set(attendance.map(a => a.date?.substring(0, 7)).filter(Boolean));
+    return [...set].sort().reverse();
+  }, [attendance]);
+
   const handleLeaveAction = async (leaveId, action) => {
     setActionLoading(leaveId);
-    const comment = action === 'Rejected'
-      ? prompt('Optional: Add a reason for rejection') || ''
-      : '';
-
+    const comment = action === 'Rejected' ? prompt('Optional: Add a reason for rejection') || '' : '';
     await fetch('/api/admin-leaves', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ leaveId, action, adminComments: comment }),
     });
-
     setActionLoading(null);
     fetchData();
   };
 
+  const filteredLeaves = useMemo(() => {
+    return leaves.filter(l => leaveFilter === 'All' || l.status === leaveFilter);
+  }, [leaves, leaveFilter]);
+
+  const getDayName = (dateStr) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short' });
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Attendance & Leave Management</h2>
-      </div>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 24 }}>Attendance & Leave Management</h2>
 
       {/* Tab Switcher */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        <button
-          onClick={() => setTab('attendance')}
-          className={`btn ${tab === 'attendance' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => setTab('attendance')} className={`btn ${tab === 'attendance' ? 'btn-primary' : 'btn-ghost'}`} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <CalendarCheck size={16} /> Attendance Records
         </button>
-        <button
-          onClick={() => setTab('leaves')}
-          className={`btn ${tab === 'leaves' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+        <button onClick={() => setTab('leaves')} className={`btn ${tab === 'leaves' ? 'btn-primary' : 'btn-ghost'}`} style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
           <ShieldCheck size={16} /> Leave Approvals
-          {pendingLeaves > 0 && (
-            <span style={{
-              background: '#ef4444', color: '#fff', fontSize: '0.65rem', fontWeight: 700,
-              padding: '2px 6px', borderRadius: 10, marginLeft: 4,
-            }}>{pendingLeaves}</span>
-          )}
+          {pendingLeaves > 0 && <span style={{ background: '#ef4444', color: '#fff', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 10, marginLeft: 4 }}>{pendingLeaves}</span>}
         </button>
       </div>
 
       {/* ════════ ATTENDANCE TAB ════════ */}
       {tab === 'attendance' && (
         <>
-          {/* Summary Cards */}
+          {/* Summary */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
             <div className="card" style={{ padding: 20, borderLeft: '4px solid var(--primary)' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Total Records</div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{attendance.length}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Records This Month</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{monthFiltered.length}</div>
             </div>
             <div className="card" style={{ padding: 20, borderLeft: '4px solid var(--success)' }}>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Present Today</div>
@@ -108,113 +124,151 @@ export default function AttendancePage() {
             </div>
           </div>
 
-          {/* Filters */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
-            <div className="card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Search size={18} color="var(--text-muted)" />
-              <input placeholder="Search by employee name..." value={search} onChange={e => setSearch(e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, flex: 1, color: 'var(--text)' }} />
-            </div>
-            <div className="card" style={{ padding: '0 16px', display: 'flex', alignItems: 'center' }}>
-              <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, width: '100%', height: '100%', outline: 'none' }}>
-                <option value="">All Dates</option>
-                {uniqueDates.slice(0, 30).map(d => <option key={d} value={d}>{new Date(d).toLocaleDateString()}</option>)}
-              </select>
-            </div>
-            <div className="card" style={{ padding: '0 16px', display: 'flex', alignItems: 'center' }}>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, width: '100%', height: '100%', outline: 'none' }}>
-                <option value="">All Statuses</option>
-                <option value="Present">Present</option>
-                <option value="Absent">Absent</option>
-                <option value="Half Day">Half Day</option>
-                <option value="On Leave">On Leave</option>
-              </select>
-            </div>
+          {/* Month Selector */}
+          <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <CalendarDays size={18} color="var(--text-muted)" />
+            <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+              style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem', fontWeight: 600 }}>
+              {months.map(m => <option key={m} value={m}>{new Date(m + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>)}
+            </select>
           </div>
 
-          {/* Attendance Table */}
-          <div className="card" style={{ overflow: 'hidden' }}>
-            <table>
-              <thead style={{ background: 'var(--surface-border)' }}>
-                <tr>
-                  <th>Employee</th>
-                  <th>Department</th>
-                  <th>Date</th>
-                  <th>Check In</th>
-                  <th>Check Out</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((a, i) => (
-                  <tr key={i}>
-                    <td style={{ fontWeight: 600 }}>{a.employeeName}</td>
-                    <td><span className="badge badge-info">{a.employeeDept}</span></td>
-                    <td style={{ fontSize: '0.85rem' }}>{a.date ? new Date(a.date).toLocaleDateString() : '-'}</td>
-                    <td style={{ fontSize: '0.85rem' }}>{a.loginTime || a.checkIn || '-'}</td>
-                    <td style={{ fontSize: '0.85rem' }}>{a.logoutTime || a.checkOut || '-'}</td>
-                    <td>
-                      <span className={`badge ${a.status === 'Present' ? 'badge-success' : a.status === 'Half Day' ? 'badge-warning' : a.status === 'On Leave' ? 'badge-info' : 'badge-danger'}`}>
-                        {a.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No attendance records found.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* Hierarchical View */}
+          {Object.keys(grouped).length === 0 ? (
+            <div className="card" style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>No attendance records for this month.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {Object.keys(grouped).sort().map(dept => {
+                const deptData = grouped[dept];
+                const empCount = Object.keys(deptData).length;
+                return (
+                  <div key={dept} className="card" style={{ overflow: 'hidden', padding: 0 }}>
+                    {/* Department Header */}
+                    <div onClick={() => toggle(setExpandedDepts, dept)} style={{
+                      padding: '16px 20px', cursor: 'pointer',
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(6,182,212,0.04))',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      borderBottom: expandedDepts[dept] ? '1px solid var(--surface-border)' : 'none',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {expandedDepts[dept] ? <ChevronDown size={18} color="var(--primary)" /> : <ChevronRight size={18} color="var(--primary)" />}
+                        <Building2 size={18} color="var(--primary)" />
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--primary)' }}>{dept}</h3>
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{empCount} employees</span>
+                    </div>
+
+                    <AnimatePresence>
+                      {expandedDepts[dept] && (
+                        <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
+                          {Object.keys(deptData).sort().map(emp => {
+                            const empKey = `${dept}-${emp}`;
+                            const records = deptData[emp];
+                            const presentDays = records.filter(r => r.status === 'Present').length;
+                            const totalHrs = records.reduce((s, r) => s + (r.totalHours || 0), 0);
+
+                            return (
+                              <div key={empKey} style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                                {/* Employee Header */}
+                                <div onClick={() => toggle(setExpandedEmps, empKey)} style={{
+                                  padding: '12px 20px 12px 48px', cursor: 'pointer', background: 'var(--bg-secondary)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    {expandedEmps[empKey] ? <ChevronDown size={16} color="var(--text-muted)" /> : <ChevronRight size={16} color="var(--text-muted)" />}
+                                    <Users size={16} color="var(--text-muted)" />
+                                    <span style={{ fontSize: '0.95rem', fontWeight: 600 }}>{emp}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    <span>{presentDays} present</span>
+                                    <span>{Math.round(totalHrs * 10) / 10}h total</span>
+                                    <span>{records.length} days</span>
+                                  </div>
+                                </div>
+
+                                {/* Day-wise calendar */}
+                                <AnimatePresence>
+                                  {expandedEmps[empKey] && (
+                                    <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
+                                      <div style={{ padding: '12px 20px 16px 72px' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                          <thead>
+                                            <tr style={{ borderBottom: '2px solid var(--surface-border)' }}>
+                                              <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Date</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Day</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Check In</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Check Out</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Hours</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Mode</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Status</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {records.map((r, i) => {
+                                              const isWeekend = r.status === 'Weekend';
+                                              return (
+                                                <tr key={i} style={{
+                                                  borderBottom: '1px solid var(--surface-border)',
+                                                  opacity: isWeekend ? 0.5 : 1,
+                                                  background: r.date === todayStr ? 'rgba(99,102,241,0.04)' : 'transparent',
+                                                }}>
+                                                  <td style={{ padding: '8px 10px', fontWeight: r.date === todayStr ? 700 : 500 }}>
+                                                    {r.date}{r.date === todayStr && <span style={{ color: 'var(--primary)', fontSize: '0.65rem', marginLeft: 4 }}>TODAY</span>}
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', color: isWeekend ? '#94a3b8' : 'var(--text)' }}>{getDayName(r.date)}</td>
+                                                  <td style={{ padding: '8px 10px' }}>{r.loginTime || '-'}</td>
+                                                  <td style={{ padding: '8px 10px' }}>{r.logoutTime || '-'}</td>
+                                                  <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.totalHours ? `${r.totalHours}h` : '-'}</td>
+                                                  <td style={{ padding: '8px 10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{r.workMode || '-'}</td>
+                                                  <td style={{ padding: '8px 10px' }}><span style={statusBadge(r.status)}>{r.status}</span></td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
 
       {/* ════════ LEAVE APPROVALS TAB ════════ */}
       {tab === 'leaves' && (
         <>
-          {/* Leave Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-            <div className="card" style={{ padding: 20, borderLeft: '4px solid #f59e0b', cursor: 'pointer' }} onClick={() => setLeaveFilter('Pending')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <Clock size={18} color="#f59e0b" />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Pending</span>
+            {[
+              { label: 'Pending', color: '#f59e0b', icon: Clock, filter: 'Pending' },
+              { label: 'Approved', color: '#10b981', icon: CheckCircle, filter: 'Approved' },
+              { label: 'Rejected', color: '#ef4444', icon: XCircle, filter: 'Rejected' },
+              { label: 'All', color: 'var(--primary)', icon: CalendarCheck, filter: 'All' },
+            ].map(({ label, color, icon: Icon, filter }) => (
+              <div key={label} className="card" style={{ padding: 20, borderLeft: `4px solid ${color}`, cursor: 'pointer' }} onClick={() => setLeaveFilter(filter)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Icon size={18} color={color} />
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>{label}</span>
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 700, color }}>{filter === 'All' ? leaves.length : leaves.filter(l => l.status === filter).length}</div>
               </div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#f59e0b' }}>{leaves.filter(l => l.status === 'Pending').length}</div>
-            </div>
-            <div className="card" style={{ padding: 20, borderLeft: '4px solid #10b981', cursor: 'pointer' }} onClick={() => setLeaveFilter('Approved')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <CheckCircle size={18} color="#10b981" />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Approved</span>
-              </div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#10b981' }}>{leaves.filter(l => l.status === 'Approved').length}</div>
-            </div>
-            <div className="card" style={{ padding: 20, borderLeft: '4px solid #ef4444', cursor: 'pointer' }} onClick={() => setLeaveFilter('Rejected')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <XCircle size={18} color="#ef4444" />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Rejected</span>
-              </div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#ef4444' }}>{leaves.filter(l => l.status === 'Rejected').length}</div>
-            </div>
-            <div className="card" style={{ padding: 20, borderLeft: '4px solid var(--primary)', cursor: 'pointer' }} onClick={() => setLeaveFilter('All')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <CalendarCheck size={18} color="var(--primary)" />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>All</span>
-              </div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{leaves.length}</div>
-            </div>
+            ))}
           </div>
 
-          {/* Leave Applications Table */}
           <div className="card" style={{ overflow: 'hidden' }}>
             <table>
               <thead style={{ background: 'var(--surface-border)' }}>
                 <tr>
-                  <th>Employee</th>
-                  <th>Department</th>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Reason</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>Employee</th><th>Department</th><th>Date</th><th>Type</th><th>Reason</th><th>Status</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -223,53 +277,17 @@ export default function AttendancePage() {
                     <td style={{ fontWeight: 600 }}>{l.userName}</td>
                     <td><span className="badge badge-info">{l.userDepartment}</span></td>
                     <td style={{ fontSize: '0.85rem' }}>{l.date ? new Date(l.date).toLocaleDateString() : '-'}</td>
-                    <td>
-                      <span className="badge" style={{
-                        background: l.leaveType === 'Comp Off' ? 'rgba(139,92,246,0.1)' : 'rgba(99,102,241,0.1)',
-                        color: l.leaveType === 'Comp Off' ? '#8b5cf6' : 'var(--primary)',
-                      }}>
-                        {l.leaveType === 'Comp Off' && '⭐ '}{l.leaveType}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '0.82rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {l.reason}
-                    </td>
-                    <td>
-                      <span className={`badge ${l.status === 'Approved' ? 'badge-success' : l.status === 'Rejected' ? 'badge-danger' : 'badge-warning'}`}
-                        style={l.status === 'Pending' ? { border: '1.5px dashed #ef4444', background: 'rgba(239,68,68,0.08)', color: '#ef4444' } : {}}>
-                        {l.status}
-                      </span>
-                    </td>
+                    <td><span className="badge" style={{ background: l.leaveType === 'Comp Off' ? 'rgba(139,92,246,0.1)' : 'rgba(99,102,241,0.1)', color: l.leaveType === 'Comp Off' ? '#8b5cf6' : 'var(--primary)' }}>{l.leaveType === 'Comp Off' && '⭐ '}{l.leaveType}</span></td>
+                    <td style={{ fontSize: '0.82rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.reason}</td>
+                    <td><span className={`badge ${l.status === 'Approved' ? 'badge-success' : l.status === 'Rejected' ? 'badge-danger' : 'badge-warning'}`} style={l.status === 'Pending' ? { border: '1.5px dashed #ef4444', background: 'rgba(239,68,68,0.08)', color: '#ef4444' } : {}}>{l.status}</span></td>
                     <td>
                       {l.status === 'Pending' ? (
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button
-                            className="btn btn-sm"
-                            disabled={actionLoading === l.id}
-                            onClick={() => handleLeaveAction(l.id, 'Approved')}
-                            style={{
-                              background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px',
-                              borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', gap: 4,
-                            }}>
-                            <CheckCircle size={13} /> Approve
-                          </button>
-                          <button
-                            className="btn btn-sm"
-                            disabled={actionLoading === l.id}
-                            onClick={() => handleLeaveAction(l.id, 'Rejected')}
-                            style={{
-                              background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px',
-                              borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', gap: 4,
-                            }}>
-                            <XCircle size={13} /> Reject
-                          </button>
+                          <button disabled={actionLoading === l.id} onClick={() => handleLeaveAction(l.id, 'Approved')} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle size={13} /> Approve</button>
+                          <button disabled={actionLoading === l.id} onClick={() => handleLeaveAction(l.id, 'Rejected')} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}><XCircle size={13} /> Reject</button>
                         </div>
                       ) : (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {l.reviewedAt ? new Date(l.reviewedAt).toLocaleDateString() : '—'}
-                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{l.reviewedAt ? new Date(l.reviewedAt).toLocaleDateString() : '—'}</span>
                       )}
                     </td>
                   </tr>
