@@ -5,44 +5,51 @@
 @tailwind utilities;
 
 :root {
-  --bg: #f1f5f9;
-  --bg-secondary: #e8ecf1;
-  --surface: #ffffff;
-  --surface-border: #cbd5e1;
-  --primary: #06b6d4;
-  --primary-light: #0891b2;
-  --primary-invert: #ffffff;
-  --text: #0f172a;
-  --text-muted: #64748b;
-  --danger: #ef4444;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  /* Modern Beige Glass Palette */
+  --bg: #f9f6f0;
+  --bg-secondary: #eee9dd;
+  --surface: rgba(255, 255, 255, 0.65);
+  --surface-hover: rgba(255, 255, 255, 0.85);
+  --surface-border: rgba(255, 255, 255, 0.7);
   
-  --sidebar-bg: #ffffff;
-  --sidebar-border: #e2e8f0;
-  --sidebar-text: #475569;
-  --sidebar-active: #f0f9ff;
+  --primary: #c29b76;
+  --primary-light: #d6b89c;
+  --primary-invert: #ffffff;
+  --text: #3c3631;
+  --text-muted: #9a9087;
+  
+  --danger: #e27d72;
+  --success: #65b891;
+  --warning: #eab269;
+  
+  --shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 8px 25px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 15px 35px rgba(0, 0, 0, 0.08);
+  
+  --sidebar-bg: rgba(255, 255, 255, 0.5);
+  --sidebar-border: rgba(255, 255, 255, 0.7);
+  --sidebar-text: #665d56;
+  --sidebar-active: rgba(194, 155, 118, 0.25);
 }
 
 [data-theme='dark'] {
-  --bg: #0b0f19;
-  --bg-secondary: #111827;
-  --surface: #1f2937;
-  --surface-border: #374151;
-  --primary: #22d3ee;
-  --primary-light: #67e8f9;
-  --primary-invert: #0b0f19;
-  --text: #f8fafc;
-  --text-muted: #94a3b8;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --bg: #2b2724;
+  --bg-secondary: #36312d;
+  --surface: rgba(43, 39, 36, 0.75);
+  --surface-hover: rgba(54, 49, 45, 0.85);
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --primary: #c29b76;
+  --primary-light: #d6b89c;
+  --primary-invert: #2b2724;
+  --text: #f4eee8;
+  --text-muted: #9a9087;
+  --shadow-sm: 0 4px 15px rgba(0,0,0,0.2);
+  --shadow-md: 0 8px 25px rgba(0,0,0,0.3);
   
-  --sidebar-bg: #111827;
-  --sidebar-border: #1f2937;
-  --sidebar-text: #94a3b8;
-  --sidebar-active: #1f2937;
+  --sidebar-bg: rgba(30, 27, 25, 0.6);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-text: #d1c8c0;
+  --sidebar-active: rgba(194, 155, 118, 0.25);
 }
 
 body {
@@ -61,6 +68,8 @@ body {
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .card:hover {
