@@ -73,8 +73,8 @@ export async function proxy(request) {
   try {
     const { payload } = await jwtVerify(token, key);
 
-    // RBAC: Admin portal requires 'System Admin' role
-    if (payload.role !== 'System Admin') {
+    // RBAC: Admin portal requires 'System Admin' or 'Super Admin' role
+    if (!['System Admin', 'Super Admin'].includes(payload.role)) {
       if (pathname.startsWith('/api/')) {
         return addSecurityHeaders(
           NextResponse.json(
