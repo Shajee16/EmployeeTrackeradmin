@@ -215,6 +215,7 @@ export default function LeadManagement() {
                                     <tr>
                                       <th style={{ fontSize: '0.75rem', padding: '8px 12px' }}>Company / Contact</th>
                                       <th style={{ fontSize: '0.75rem', padding: '8px 12px' }}>Value</th>
+                                      <th style={{ fontSize: '0.75rem', padding: '8px 12px' }}>Priority</th>
                                       <th style={{ fontSize: '0.75rem', padding: '8px 12px' }}>Status</th>
                                       <th style={{ fontSize: '0.75rem', padding: '8px 12px', textAlign: 'right' }}>Action</th>
                                     </tr>
@@ -227,6 +228,15 @@ export default function LeadManagement() {
                                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{l.contactPerson}</div>
                                         </td>
                                         <td style={{ padding: '8px 12px', fontSize: '0.85rem' }}>₹{Number(l.dealValue || 0).toLocaleString()}</td>
+                                        <td style={{ padding: '8px 12px' }}>
+                                          <span style={{ 
+                                            padding: '3px 8px', borderRadius: 12, fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase',
+                                            background: l.priority === 'High' ? 'rgba(239, 68, 68, 0.1)' : l.priority === 'Medium' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                            color: l.priority === 'High' ? '#ef4444' : l.priority === 'Medium' ? '#f59e0b' : '#10b981'
+                                          }}>
+                                            {l.priority || 'Low'}
+                                          </span>
+                                        </td>
                                         <td style={{ padding: '8px 12px' }}>
                                           <select value={l.status} onChange={e => updateStatus(l.id, e.target.value)}
                                             style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: 4, background: 'var(--bg)', border: '1px solid var(--surface-border)', color: 'var(--text)' }}>
