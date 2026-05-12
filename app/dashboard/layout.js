@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, createContext, useContext } from 'react';
 import { ShieldAlert, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
+import logoImg from '../logo.png';
 
 const ThemeContext = createContext(null);
 export const useTheme = () => useContext(ThemeContext);
@@ -91,7 +92,7 @@ export default function DashboardLayout({ children }) {
           {/* Logo */}
           <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--sidebar-border)' }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-              <img src="/logo.png" alt="Logo" style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
+              <img src={logoImg.src} alt="Logo" style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
             </div>
             <span style={{ color: 'var(--text)', fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Cluso Admin</span>
           </div>
