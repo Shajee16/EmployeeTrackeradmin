@@ -24,7 +24,8 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [theme, setTheme] = useState('dark');
+  const [themeMode, setThemeMode] = useState('dark');
+  const [themeColor, setThemeColor] = useState('beige');
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -35,17 +36,33 @@ export default function DashboardLayout({ children }) {
         setLoading(false);
       }
     }).catch(() => router.push('/login'));
-    
-    // Default to dark theme but let it be toggled
-    const saved = localStorage.getItem('admin_theme');
-    if (saved) setTheme(saved);
-    else document.documentElement.setAttribute('data-theme', 'dark');
+    // Default to dark beige theme but let it be toggled
+    const savedMode = localStorage.getItem('admin_themeMode');
+    const savedColor = localStorage.getItem('admin_themeColor');
+    if (savedMode) setThemeMode(savedMode);
+    if (savedColor) setThemeColor(savedColor);
+    else document.documentElement.setAttribute('data-theme', 'dark'); // default beige dark
   }, [router]);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('admin_theme', theme);
-  }, [theme]);
+    let mode = themeMode;
+    if (themeMode === 'system') {
+      mode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    
+    let apply = themeColor;
+    if (mode === 'dark') {
+      apply = themeColor === 'beige' ? 'dark' : `${themeColor}-dark`;
+    } else if (themeColor !== 'beige') {
+      apply = themeColor;
+    } else {
+      apply = 'light';
+    }
+    
+    document.documentElement.setAttribute('data-theme', apply);
+    localStorage.setItem('admin_themeMode', themeMode);
+    localStorage.setItem('admin_themeColor', themeColor);
+  }, [themeMode, themeColor]);
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
@@ -58,7 +75,7 @@ export default function DashboardLayout({ children }) {
   );
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme: themeMode, setTheme: setThemeMode, themeColor, setThemeColor }}>
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
         {/* Mobile overlay */}
         {mobileOpen && <div onClick={() => setMobileOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }} />}
@@ -104,7 +121,7 @@ export default function DashboardLayout({ children }) {
 
           {/* User Profile */}
           <div style={{ padding: '16px', borderTop: '1px solid var(--sidebar-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#06b6d4,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary-light), var(--accent, #8b5cf6))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-invert, #fff)', fontWeight: 700 }}>
               {user?.name?.charAt(0) || 'A'}
             </div>
             <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -135,12 +152,30 @@ export default function DashboardLayout({ children }) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              {/* Theme color palette toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '24px', marginRight: 8 }}>
+                {[
+                  { key: 'beige', color: '#c29b76' },
+                  { key: 'seafoam', color: '#5b9e8c' },
+                  { key: 'rose', color: '#c97a8e' },
+                ].map(({ key, color }) => (
+                  <button key={key} onClick={() => setThemeColor(key)}
+                    style={{
+                      width: 24, height: 24, borderRadius: '50%', border: '2px solid',
+                      borderColor: themeColor === key ? 'var(--text)' : 'transparent',
+                      background: color, margin: '0 2px',
+                      cursor: 'pointer', transition: 'all 0.2s',
+                    }}
+                    title={`Color: ${key}`} />
+                ))}
+              </div>
+
               {/* Theme Toggle Slider */}
               <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '24px' }}>
                 {['light', 'dark'].map(t => (
-                  <button key={t} onClick={() => setTheme(t)}
-                    style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: theme === t ? 'var(--surface)' : 'transparent', boxShadow: theme === t ? 'var(--shadow-sm)' : 'none', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: theme === t ? 'var(--primary)' : 'var(--text-muted)' }}
-                    title={`Theme: ${t}`}>
+                  <button key={t} onClick={() => setThemeMode(t)}
+                    style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: themeMode === t ? 'var(--surface)' : 'transparent', boxShadow: themeMode === t ? 'var(--shadow-sm)' : 'none', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: themeMode === t ? 'var(--primary)' : 'var(--text-muted)' }}
+                    title={`Mode: ${t}`}>
                     {t === 'light' ? '☀️' : '🌙'}
                   </button>
                 ))}
