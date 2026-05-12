@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth';
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  if (session.role !== 'System Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!['System Admin', 'Super Admin'].includes(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const users = await readData('users');
   const leads = await readData('leads');

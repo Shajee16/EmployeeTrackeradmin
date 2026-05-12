@@ -8,7 +8,7 @@ import { v4 as uuid } from 'uuid';
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  if (session.role !== 'System Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!['System Admin', 'Super Admin'].includes(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   let departments = await readData('departments');
   if (departments.length === 0) {
@@ -31,7 +31,7 @@ export async function GET() {
 export async function POST(req) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  if (session.role !== 'System Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!['System Admin', 'Super Admin'].includes(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   let body;
   try {
@@ -60,7 +60,7 @@ export async function POST(req) {
 export async function DELETE(req) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  if (session.role !== 'System Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!['System Admin', 'Super Admin'].includes(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const id = sanitizeString(searchParams.get('id'), 50);
