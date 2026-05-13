@@ -34,6 +34,17 @@ export async function PUT(req) {
   if (body.type === 'profile') {
     update.displayName = sanitizeString(body.displayName || '', 100);
     update.phone = sanitizeString(body.phone || '', 20);
+
+    // Sync name to the admins collection so Admin Management, activity logs etc. stay consistent
+    const newName = sanitizeString(body.displayName || '', 100);
+    if (newName) {
+      const adminsCol = db.collection('admins');
+      // Match by email (session.email) or by custom id (session.id)
+      await adminsCol.updateOne(
+        { $or: [{ email: session.email }, { id: session.id }] },
+        { $set: { name: newName, phone: sanitizeString(body.phone || '', 20), updatedAt: new Date().toISOString() } }
+      );
+    }
   }
   if (body.type === 'profilePicture') {
     if (!body.picture) {
