@@ -16,23 +16,14 @@ export default function TaskManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // task to delete
   const fileInputRef = useRef(null);
-  const tasksRef = useRef('[]');
 
-  const load = (force) => {
-    fetch(`/api/admin-tasks?t=${Date.now()}`).then(r => r.json()).then(d => {
-      const incoming = JSON.stringify(d.tasks || []);
-      if (force || incoming !== tasksRef.current) {
-        tasksRef.current = incoming;
-        setTasks(d.tasks || []);
-      }
-    });
+  const load = () => {
+    fetch(`/api/admin-tasks?t=${Date.now()}`).then(r => r.json()).then(d => setTasks(d.tasks || []));
   };
 
   useEffect(() => {
     load();
-    const poll = setInterval(load, 15000);
     fetch('/api/admin-employees').then(r => r.json()).then(d => setEmployees(d.employees || []));
-    return () => clearInterval(poll);
   }, []);
 
   const filtered = useMemo(() => {
@@ -87,7 +78,7 @@ export default function TaskManagement() {
       setForm({ userId: '', title: '', description: '', priority: 'Medium', deadline: '' });
       setAttachment(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      load(true);
+      load();
     } catch (err) {
       console.error('Task creation error:', err);
     }
@@ -115,7 +106,7 @@ export default function TaskManagement() {
       const res = await fetch(`/api/admin-tasks?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete task');
-      load(true);
+      load();
     } catch (err) {
       console.error(err);
       alert('Error deleting task: ' + err.message);
