@@ -168,3 +168,87 @@ export async function PUT(req) {
   return NextResponse.json({ lead: leads[idx], success: true });
 }
 
+/**
+ * DELETE /api/admin-leads?id=xxx  — Admin permanently deletes a lead
+ * DELETE /api/admin-leads?action=approve-delete&requestId=xxx — Approve employee deletion request
+ * DELETE /api/admin-leads?action=reject-delete&requestId=xxx — Reject employee deletion request
+ */
+export async function DELETE(req) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!['System Admin', 'Super Admin'].includes(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const { searchParams } = new URL(req.url);
+  const action = searchParams.get('action');
+  const db = await getDb();
+
+  // Handle employee deletion request approval/rejection
+  if (action === 'approve-delete' || action === 'reject-delete') {
+    const requestId = sanitizeString(searchParams.get('requestId'), 50);
+    if (!requestId) return NextResponse.json({ error: 'requestId required' }, { status: 400 });
+
+    const request = await db.collection('lead_deletion_requests').findOne({ id: requestId });
+    if (!request) return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+
+    if (action === 'approve-delete') {
+      // Actually delete the lead
+      const leads = await readData('leads');
+      const filtered = leads.filter(l => l.id !== request.leadId);
+      await writeData('leads', filtered);
+
+      await db.collection('lead_deletion_requests').updateOne(
+        { id: requestId },
+        { $set: { status: 'approved', reviewedBy: session.name || session.email, reviewedAt: new Date().toISOString() } }
+      );
+
+      await logAdminAction(session, 'APPROVE_LEAD_DELETE', 'lead', request.leadId, {
+        requestedBy: request.requestedByName,
+        reason: request.reason,
+        leadCompany: request.leadCompanyName,
+      });
+
+      return NextResponse.json({ success: true, message: 'Deletion approved — lead permanently removed.' });
+    } else {
+      // Reject — just update the request status, unmark the lead
+      const leads = await readData('leads');
+      const idx = leads.findIndex(l => l.id === request.leadId);
+      if (idx !== -1) {
+        leads[idx].deletionRequested = false;
+        leads[idx].deletionRequestId = null;
+        leads[idx].updatedAt = new Date().toISOString();
+        await writeData('leads', leads);
+      }
+
+      await db.collection('lead_deletion_requests').updateOne(
+        { id: requestId },
+        { $set: { status: 'rejected', reviewedBy: session.name || session.email, reviewedAt: new Date().toISOString() } }
+      );
+
+      return NextResponse.json({ success: true, message: 'Deletion request rejected.' });
+    }
+  }
+
+  // Direct admin delete
+  const id = sanitizeString(searchParams.get('id'), 50);
+  if (!id) return NextResponse.json({ error: 'Lead ID required' }, { status: 400 });
+
+  const leads = await readData('leads');
+  const lead = leads.find(l => l.id === id);
+  if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+
+  const filtered = leads.filter(l => l.id !== id);
+  await writeData('leads', filtered);
+
+  // Also clean up any pending deletion requests for this lead
+  await db.collection('lead_deletion_requests').updateMany(
+    { leadId: id, status: 'pending' },
+    { $set: { status: 'superseded', reviewedBy: session.name || session.email, reviewedAt: new Date().toISOString() } }
+  );
+
+  await logAdminAction(session, 'DELETE_LEAD', 'lead', id, {
+    company: lead.companyName,
+    contact: lead.contactPerson,
+  });
+
+  return NextResponse.json({ success: true });
+}

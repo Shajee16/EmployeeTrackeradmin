@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Search, Phone, Mail, DollarSign, Users, TrendingUp, ChevronDown, ChevronRight, MessageSquare, Send, RefreshCw } from 'lucide-react';
+import { Target, Search, Phone, Mail, DollarSign, Users, TrendingUp, ChevronDown, ChevronRight, MessageSquare, Send, RefreshCw, Trash2, UserPlus, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
 export default function LeadManagement() {
   const [leads, setLeads] = useState([]);
@@ -16,19 +16,24 @@ export default function LeadManagement() {
   const [replyBody, setReplyBody] = useState('');
   const [replySubject, setReplySubject] = useState('');
   const [sending, setSending] = useState(false);
+  const [reassignModal, setReassignModal] = useState(null);
+  const [reassignTarget, setReassignTarget] = useState('');
+  const [deletionRequests, setDeletionRequests] = useState([]);
 
   const loadData = async () => {
     try {
       const ts = Date.now();
-      const [leadsRes, empsRes, emailsRes] = await Promise.all([
+      const [leadsRes, empsRes, emailsRes, delReqRes] = await Promise.all([
         fetch(`/api/admin-leads?t=${ts}`).then(r => r.json()),
         fetch(`/api/admin-employees?t=${ts}`).then(r => r.json()),
-        fetch(`/api/admin-leads/emails?t=${ts}`).then(r => r.json())
+        fetch(`/api/admin-leads/emails?t=${ts}`).then(r => r.json()),
+        fetch(`/api/admin-leads/deletion-requests?t=${ts}`).then(r => r.json()),
       ]);
       setLeads(leadsRes.leads || []);
       setEmployees(empsRes.employees || []);
       setEmails(emailsRes.emails || []);
       setReplies(emailsRes.replies || []);
+      setDeletionRequests(delReqRes.requests || []);
     } catch (err) {
       console.error('Failed to load data', err);
     }
@@ -76,6 +81,38 @@ export default function LeadManagement() {
     }
     setSending(false);
   };
+
+  // Delete lead (admin)
+  const deleteLead = async (lead) => {
+    if (!confirm(`Permanently delete "${lead.companyName}" (${lead.contactPerson})?\n\nThis action cannot be undone.`)) return;
+    const res = await fetch(`/api/admin-leads?id=${lead.id}`, { method: 'DELETE' });
+    if (res.ok) loadData();
+    else alert('Failed to delete lead');
+  };
+
+  // Reassign lead
+  const reassignLead = async () => {
+    if (!reassignModal || !reassignTarget) return;
+    const res = await fetch('/api/admin-leads', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: reassignModal.id, userId: reassignTarget }),
+    });
+    if (res.ok) {
+      setReassignModal(null);
+      setReassignTarget('');
+      loadData();
+    } else alert('Failed to reassign lead');
+  };
+
+  // Approve/Reject deletion request
+  const handleDeletionRequest = async (requestId, action) => {
+    const res = await fetch(`/api/admin-leads?action=${action}&requestId=${requestId}`, { method: 'DELETE' });
+    if (res.ok) loadData();
+    else alert('Failed to process request');
+  };
+
+  const pendingDeletionRequests = deletionRequests.filter(r => r.status === 'pending');
 
   const statuses = [...new Set(leads.map(l => l.status).filter(Boolean))];
 
@@ -249,10 +286,23 @@ export default function LeadManagement() {
                                           </select>
                                         </td>
                                         <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                                          <button className="btn btn-sm btn-outline" style={{ fontSize: '0.7rem', padding: '4px 8px' }}
-                                            onClick={() => setDetailModal(l)}>
-                                            Details & Comms
-                                          </button>
+                                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                            <button className="btn btn-sm btn-outline" style={{ fontSize: '0.7rem', padding: '4px 8px' }}
+                                              onClick={() => setDetailModal(l)}>
+                                              Details & Comms
+                                            </button>
+                                            <button style={{ fontSize: '0.68rem', padding: '4px 8px', borderRadius: 6, border: 'none', background: 'rgba(99,102,241,0.1)', color: '#6366f1', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                                              onClick={() => { setReassignModal(l); setReassignTarget(''); }}
+                                              title="Reassign to another employee">
+                                              <UserPlus size={12} /> Reassign
+                                            </button>
+                                            <button style={{ fontSize: '0.68rem', padding: '4px 8px', borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                                              onClick={() => deleteLead(l)}
+                                              title="Permanently delete this lead">
+                                              <Trash2 size={12} /> Delete
+                                            </button>
+                                          </div>
+                                          {l.deletionRequested && <div style={{ marginTop: 4, fontSize: '0.65rem', fontWeight: 700, color: '#f59e0b' }}>⚠️ Deletion requested</div>}
                                         </td>
                                       </tr>
                                     ))}
@@ -404,6 +454,108 @@ export default function LeadManagement() {
                   </div>
                   {!detailModal.email && <div style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: 8, textAlign: 'right' }}>Lead has no email address.</div>}
                 </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ═══ DELETION REQUESTS PANEL ═══ */}
+      {pendingDeletionRequests.length > 0 && (
+        <div className="card" style={{ marginTop: 24, border: '1.5px solid rgba(245,158,11,0.3)', background: 'linear-gradient(135deg, rgba(245,158,11,0.04), rgba(239,68,68,0.02))' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #f59e0b, #ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertTriangle size={18} color="#fff" />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Lead Deletion Requests</h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>{pendingDeletionRequests.length} pending request{pendingDeletionRequests.length > 1 ? 's' : ''} from employees</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {pendingDeletionRequests.map(r => (
+              <div key={r.id} style={{
+                padding: '14px 18px', borderRadius: 12,
+                background: 'var(--surface)', border: '1px solid var(--surface-border)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
+              }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{r.leadCompanyName} <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.82rem' }}>({r.leadContactPerson})</span></div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                    Requested by <strong style={{ color: 'var(--primary)' }}>{r.requestedByName}</strong> • {new Date(r.requestedAt).toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: '0.82rem', marginTop: 6, padding: '6px 10px', borderRadius: 8, background: 'var(--bg-secondary)', fontStyle: 'italic', color: 'var(--text)' }}>
+                    Reason: "{r.reason}"
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => handleDeletionRequest(r.id, 'approve-delete')}
+                    style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <CheckCircle size={14} /> Approve & Delete
+                  </button>
+                  <button
+                    onClick={() => handleDeletionRequest(r.id, 'reject-delete')}
+                    style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)', fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <XCircle size={14} /> Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ REASSIGN MODAL ═══ */}
+      {reassignModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }} onClick={() => setReassignModal(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="card" style={{ width: '100%', maxWidth: 500, padding: 0, overflow: 'hidden' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #6366f1, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <UserPlus size={18} color="#fff" />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Reassign Lead</h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>{reassignModal.companyName} — {reassignModal.contactPerson}</p>
+              </div>
+            </div>
+            <div style={{ padding: 24 }}>
+              <div style={{ padding: '12px 16px', borderRadius: 10, background: 'var(--bg-secondary)', marginBottom: 16, fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Currently assigned to: </span>
+                <strong style={{ color: 'var(--primary)' }}>{reassignModal.assignedAsset || 'Unassigned'}</strong>
+              </div>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>New Employee</label>
+              <select
+                value={reassignTarget}
+                onChange={e => setReassignTarget(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.88rem', fontFamily: 'inherit', marginBottom: 8 }}
+              >
+                <option value="">— Select Employee —</option>
+                {employees.filter(e => e.id !== reassignModal.userId).map(e => (
+                  <option key={e.id} value={e.id}>{e.name} ({e.department || 'No Dept'}) — {e.email}</option>
+                ))}
+              </select>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '8px 0 20px', lineHeight: 1.5 }}>
+                All lead history, activities, and email correspondence will transfer to the new employee.
+              </p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <button onClick={() => setReassignModal(null)} className="btn btn-outline">Cancel</button>
+                <button
+                  onClick={reassignLead}
+                  disabled={!reassignTarget}
+                  style={{
+                    padding: '10px 24px', borderRadius: 10, border: 'none', fontWeight: 700, cursor: 'pointer', color: '#fff',
+                    background: !reassignTarget ? '#9ca3af' : 'linear-gradient(135deg, #6366f1, #7c3aed)',
+                    boxShadow: !reassignTarget ? 'none' : '0 4px 16px rgba(99,102,241,0.35)',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}
+                >
+                  <UserPlus size={16} /> Reassign Lead
+                </button>
               </div>
             </div>
           </motion.div>
