@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserX, Power, UserPlus, Edit, Eye, EyeOff, X, Check, AlertCircle, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Circle } from 'lucide-react';
+import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff } from 'lucide-react';
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState([]);
