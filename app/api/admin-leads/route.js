@@ -177,6 +177,18 @@ export async function PUT(req) {
     }
   }
 
+  // Admin comment for employee
+  if (body.adminComment && typeof body.adminComment === 'string') {
+    leads[idx].activities = leads[idx].activities || [];
+    leads[idx].activities.push({
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+      type: 'Admin Comment',
+      description: sanitizeString(body.adminComment, 2000),
+      by: session.name || session.email,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   leads[idx].updatedAt = new Date().toISOString();
   await writeData('leads', leads);
 

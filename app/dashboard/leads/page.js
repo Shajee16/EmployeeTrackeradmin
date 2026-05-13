@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Search, Phone, Mail, DollarSign, Users, TrendingUp, ChevronDown, ChevronRight, MessageSquare, Send, RefreshCw, Trash2, UserPlus, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Target, Search, Phone, Mail, DollarSign, Users, TrendingUp, ChevronDown, ChevronRight, MessageSquare, Send, RefreshCw, Trash2, UserPlus, AlertTriangle, CheckCircle, XCircle, Save, Edit3, MessageCircle } from 'lucide-react';
 
 export default function LeadManagement() {
   const [leads, setLeads] = useState([]);
@@ -19,6 +19,12 @@ export default function LeadManagement() {
   const [reassignModal, setReassignModal] = useState(null);
   const [reassignTarget, setReassignTarget] = useState('');
   const [deletionRequests, setDeletionRequests] = useState([]);
+  // Editable form state for detail modal
+  const [editForm, setEditForm] = useState({});
+  const [editDirty, setEditDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveFlash, setSaveFlash] = useState('');
+  const [adminComment, setAdminComment] = useState('');
 
   const loadData = async () => {
     try {
@@ -49,18 +55,61 @@ export default function LeadManagement() {
     loadData();
     if (detailModal && detailModal.id === id) {
       setDetailModal(prev => ({ ...prev, status }));
+      setEditForm(prev => ({ ...prev, status }));
     }
   };
 
-  const updateLeadField = async (id, field, value) => {
-    await fetch('/api/admin-leads', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, [field]: value })
+  // Open detail modal & init local edit form
+  const openDetailModal = (lead) => {
+    setDetailModal(lead);
+    setEditForm({
+      status: lead.status || 'New',
+      priority: lead.priority || 'Medium',
+      dealValue: lead.dealValue || '',
+      notes: lead.notes || '',
     });
-    loadData();
-    if (detailModal && detailModal.id === id) {
-      setDetailModal(prev => ({ ...prev, [field]: value }));
+    setEditDirty(false);
+    setSaveFlash('');
+    setAdminComment('');
+  };
+
+  // Edit a field locally (no API call yet)
+  const editField = (field, value) => {
+    setEditForm(prev => ({ ...prev, [field]: value }));
+    setEditDirty(true);
+  };
+
+  // Save all changes to API
+  const saveLeadChanges = async () => {
+    if (!detailModal) return;
+    setSaving(true);
+    const payload = { id: detailModal.id, ...editForm };
+    // Include admin comment if provided
+    if (adminComment.trim()) {
+      payload.adminComment = adminComment.trim();
     }
+    try {
+      const res = await fetch('/api/admin-leads', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDetailModal(prev => ({ ...prev, ...editForm, activities: data.lead?.activities || prev.activities }));
+        setEditDirty(false);
+        setSaveFlash('✓ Saved');
+        setAdminComment('');
+        setTimeout(() => setSaveFlash(''), 2000);
+        loadData();
+      } else {
+        setSaveFlash('✗ Failed to save');
+        setTimeout(() => setSaveFlash(''), 3000);
+      }
+    } catch {
+      setSaveFlash('✗ Network error');
+      setTimeout(() => setSaveFlash(''), 3000);
+    }
+    setSaving(false);
   };
 
   const sendReply = async (lead) => {
@@ -299,7 +348,7 @@ export default function LeadManagement() {
                                         <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                                           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                                             <button className="btn btn-sm btn-outline" style={{ fontSize: '0.7rem', padding: '4px 8px' }}
-                                              onClick={() => setDetailModal(l)}>
+                                              onClick={() => openDetailModal(l)}>
                                               Details & Comms
                                             </button>
                                             <button style={{ fontSize: '0.68rem', padding: '4px 8px', borderRadius: 6, border: 'none', background: 'rgba(99,102,241,0.1)', color: '#6366f1', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
@@ -335,74 +384,83 @@ export default function LeadManagement() {
 
       {/* Detail & Communication Modal */}
       {detailModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }} onClick={() => setDetailModal(null)}>
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="card" style={{ width: '100%', maxWidth: 900, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }} onClick={() => setDetailModal(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            style={{ width: '100%', maxWidth: 960, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: 20, background: 'var(--surface)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 25px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05) inset' }}
             onClick={e => e.stopPropagation()}>
             
             {/* Header */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ padding: '22px 28px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(6,182,212,0.04))' }}>
               <div>
-                <h3 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>{detailModal.companyName}</h3>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4, display: 'flex', gap: 12 }}>
-                  <span><Users size={12} style={{ display: 'inline', marginRight: 4 }}/>{detailModal.contactPerson}</span>
-                  <span><Mail size={12} style={{ display: 'inline', marginRight: 4 }}/>{detailModal.email || 'No email'}</span>
-                  <span><Phone size={12} style={{ display: 'inline', marginRight: 4 }}/>{detailModal.phone || 'No phone'}</span>
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>{detailModal.companyName}</h3>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: 6, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Users size={13}/>{detailModal.contactPerson}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Mail size={13}/>{detailModal.email || 'No email'}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Phone size={13}/>{detailModal.phone || 'No phone'}</span>
                 </div>
               </div>
-              <button className="btn btn-outline" onClick={() => setDetailModal(null)}>Close</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {saveFlash && <span style={{ fontSize: '0.78rem', fontWeight: 700, color: saveFlash.startsWith('✓') ? '#10b981' : '#ef4444', animation: 'fadeIn 0.3s' }}>{saveFlash}</span>}
+                {editDirty && (
+                  <button onClick={saveLeadChanges} disabled={saving}
+                    style={{ padding: '8px 20px', borderRadius: 10, border: 'none', fontWeight: 700, cursor: 'pointer', color: '#fff', fontSize: '0.82rem', background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.35)', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }}>
+                    <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                )}
+                <button onClick={() => setDetailModal(null)} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem' }}>Close</button>
+              </div>
             </div>
 
             {/* Body */}
-            <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: typeof window !== 'undefined' && window.innerWidth < 768 ? 'column' : 'row' }}>
               
               {/* Left Col: Lead Info & Activity */}
               <div style={{ flex: 1, borderRight: '1px solid var(--surface-border)', overflowY: 'auto', padding: 24 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-                  <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Assigned To</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--primary)' }}>{detailModal.assignedAsset}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+                  <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: 12, border: '1px solid var(--surface-border)' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Assigned To</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)' }}>{detailModal.assignedAsset}</div>
                   </div>
-                  <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Status</div>
-                    <select 
-                      value={detailModal.status || ''} 
-                      onChange={e => updateLeadField(detailModal.id, 'status', e.target.value)}
-                      style={{ fontSize: '0.9rem', fontWeight: 600, width: '100%', border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '4px', borderRadius: '4px' }}>
-                      <option value="New">New</option>
-                      <option value="Contacted">Contacted</option>
-                      <option value="Qualified">Qualified</option>
-                      <option value="Proposal">Proposal</option>
-                      <option value="Negotiation">Negotiation</option>
-                      <option value="Closed">Closed</option>
-                      <option value="Lost">Lost</option>
+                  <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: 12, border: '1px solid var(--surface-border)' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Status</div>
+                    <select value={editForm.status || ''} onChange={e => editField('status', e.target.value)}
+                      style={{ fontSize: '0.85rem', fontWeight: 600, width: '100%', border: '1.5px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '6px 8px', borderRadius: 8, outline: 'none', fontFamily: 'inherit' }}>
+                      {['New','Contacted','Qualified','Proposal','Negotiation','Closed','Lost'].map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
-                  <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Deal Value</div>
+                  <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: 12, border: '1px solid var(--surface-border)' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Deal Value</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>₹</span>
-                      <input 
-                        type="number" 
-                        value={detailModal.dealValue || ''} 
-                        onChange={e => updateLeadField(detailModal.id, 'dealValue', e.target.value)}
-                        onBlur={e => updateLeadField(detailModal.id, 'dealValue', e.target.value)}
-                        style={{ fontSize: '0.9rem', fontWeight: 600, width: '100%', border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '4px', borderRadius: '4px' }} 
-                      />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>₹</span>
+                      <input type="number" value={editForm.dealValue || ''} onChange={e => editField('dealValue', e.target.value)} placeholder="0"
+                        style={{ fontSize: '0.85rem', fontWeight: 600, width: '100%', border: '1.5px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '6px 8px', borderRadius: 8, outline: 'none', fontFamily: 'inherit' }} />
                     </div>
                   </div>
-                  <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8 }}>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Priority</div>
-                    <select 
-                      value={detailModal.priority || ''} 
-                      onChange={e => updateLeadField(detailModal.id, 'priority', e.target.value)}
-                      style={{ fontSize: '0.9rem', fontWeight: 600, width: '100%', border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '4px', borderRadius: '4px' }}>
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Critical">Critical</option>
+                  <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: 12, border: '1px solid var(--surface-border)' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Priority</div>
+                    <select value={editForm.priority || ''} onChange={e => editField('priority', e.target.value)}
+                      style={{ fontSize: '0.85rem', fontWeight: 600, width: '100%', border: '1.5px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '6px 8px', borderRadius: 8, outline: 'none', fontFamily: 'inherit' }}>
+                      {['Low','Medium','High','Critical'].map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
+                </div>
+
+                {/* Notes */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Notes</div>
+                  <textarea value={editForm.notes || ''} onChange={e => editField('notes', e.target.value)} rows={2} placeholder="Add notes about this lead..."
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.82rem', resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5 }} />
+                </div>
+
+                {/* Admin Comment for Employee */}
+                <div style={{ marginBottom: 20, padding: '14px 16px', borderRadius: 12, border: '1.5px dashed rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.04)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <MessageCircle size={14} color="#6366f1" />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6366f1' }}>Admin Comment for Employee</span>
+                  </div>
+                  <textarea value={adminComment} onChange={e => { setAdminComment(e.target.value); setEditDirty(true); }} rows={2} placeholder="Leave a comment visible to the assigned employee..."
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.03)', color: 'var(--text)', fontSize: '0.82rem', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5 }} />
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '6px 0 0', fontStyle: 'italic' }}>This comment will appear in the employee's activity log for this lead.</p>
                 </div>
 
                 <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -549,9 +607,9 @@ export default function LeadManagement() {
 
       {/* ═══ REASSIGN MODAL ═══ */}
       {reassignModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }} onClick={() => setReassignModal(null)}>
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="card" style={{ width: '100%', maxWidth: 500, padding: 0, overflow: 'hidden' }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }} onClick={() => setReassignModal(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            style={{ width: '100%', maxWidth: 500, overflow: 'hidden', borderRadius: 20, background: 'var(--surface)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #6366f1, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
