@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { readData, writeData } from '@/lib/db';
+import { readData, writeData, getDb } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { sanitizeInput, sanitizeString, isNonEmptyString, isOneOf } from '@/lib/sanitize';
 import { logAdminAction } from '@/lib/audit';
 import { v4 as uuid } from 'uuid';
+import { sendTaskEmail } from '@/lib/mailer';
+
+const MAX_ATTACHMENT_SIZE = 3 * 1024 * 1024; // 3 MB
 
 export async function GET() {
   const session = await getSession();
@@ -12,6 +15,15 @@ export async function GET() {
 
   const tasks = await readData('tasks');
   const users = await readData('users');
+
+  // Auto-cleanup: remove attachments older than 25 days from MongoDB
+  try {
+    const db = await getDb();
+    const cutoff = new Date(Date.now() - 25 * 24 * 60 * 60 * 1000);
+    await db.collection('task_attachments').deleteMany({ createdAt: { $lt: cutoff.toISOString() } });
+  } catch (err) {
+    console.error('Attachment cleanup error (non-fatal):', err);
+  }
 
   const enhanced = tasks.map(t => {
     const u = users.find(user => user.id === t.userId);
@@ -27,12 +39,17 @@ export async function POST(req) {
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   if (!['System Admin', 'Super Admin'].includes(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  let body;
+  let rawBody;
   try {
-    body = sanitizeInput(await req.json());
+    rawBody = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
+
+  // Extract attachment before sanitization (base64 is huge)
+  const rawAttachment = rawBody.attachment || null;
+  delete rawBody.attachment;
+  const body = sanitizeInput(rawBody);
 
   if (!isNonEmptyString(body.userId)) {
     return NextResponse.json({ error: 'Employee (userId) is required' }, { status: 400 });
@@ -42,9 +59,12 @@ export async function POST(req) {
   }
 
   const tasks = await readData('tasks');
+  const users = await readData('users');
+  const assignedUser = users.find(u => u.id === body.userId);
 
+  const taskId = uuid();
   const newTask = {
-    id: uuid(),
+    id: taskId,
     userId: sanitizeString(body.userId, 50),
     title: sanitizeString(body.title, 200),
     description: sanitizeString(body.description || '', 2000),
@@ -54,7 +74,34 @@ export async function POST(req) {
     comments: [],
     completionProof: null,
     createdAt: new Date().toISOString(),
+    hasAttachment: false,
+    attachmentName: null,
   };
+
+  // Handle attachment: validate size, store in MongoDB
+  let attachmentData = null;
+  if (rawAttachment && rawAttachment.data && rawAttachment.filename) {
+    const base64Part = rawAttachment.data.split(',')[1] || rawAttachment.data;
+    const sizeInBytes = Math.ceil(base64Part.length * 3 / 4);
+    
+    if (sizeInBytes > MAX_ATTACHMENT_SIZE) {
+      return NextResponse.json({ error: 'Attachment exceeds 3 MB limit' }, { status: 400 });
+    }
+
+    const db = await getDb();
+    attachmentData = {
+      taskId,
+      filename: sanitizeString(rawAttachment.filename, 200),
+      contentType: sanitizeString(rawAttachment.contentType || 'application/octet-stream', 100),
+      base64Data: base64Part,
+      sizeBytes: sizeInBytes,
+      createdAt: new Date().toISOString(),
+    };
+    await db.collection('task_attachments').insertOne(attachmentData);
+
+    newTask.hasAttachment = true;
+    newTask.attachmentName = attachmentData.filename;
+  }
 
   tasks.push(newTask);
   await writeData('tasks', tasks);
@@ -64,6 +111,61 @@ export async function POST(req) {
     assignedTo: newTask.userId,
     priority: newTask.priority,
   });
+
+  // Send email notification to the assigned employee
+  if (assignedUser && assignedUser.email) {
+    const priorityColors = { Low: '#3b82f6', Medium: '#f59e0b', High: '#ef4444', Critical: '#dc2626' };
+    const priorityColor = priorityColors[newTask.priority] || '#6b7280';
+    const deadlineFormatted = newTask.deadline ? new Date(newTask.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not set';
+    
+    const htmlBody = `
+      <div style="font-family: 'Segoe UI', Calibri, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fafafa; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb;">
+        <div style="background: linear-gradient(135deg, #6366f1, #7c3aed); padding: 28px 32px; color: #fff;">
+          <h1 style="margin: 0 0 6px 0; font-size: 20px; font-weight: 700;">📋 New Task Assigned</h1>
+          <p style="margin: 0; opacity: 0.85; font-size: 14px;">You have been assigned a new task by ${session.name || 'Admin'}</p>
+        </div>
+        <div style="padding: 28px 32px;">
+          <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #111827;">${newTask.title}</h2>
+          ${newTask.description ? `<div style="background: #f3f4f6; padding: 14px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; line-height: 1.7; color: #374151; border-left: 4px solid #6366f1;">${newTask.description.replace(/\n/g, '<br/>')}</div>` : ''}
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 13px; width: 120px;">Priority</td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;"><span style="background: ${priorityColor}; color: #fff; padding: 3px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">${newTask.priority}</span></td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 13px;">Deadline</td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827; font-size: 14px;">📅 ${deadlineFormatted}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 13px;">Assigned By</td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827; font-size: 14px;">${session.name || session.email}</td>
+            </tr>
+            ${newTask.hasAttachment ? `<tr><td style="padding: 10px 0; color: #6b7280; font-size: 13px;">Attachment</td><td style="padding: 10px 0; font-weight: 600; color: #111827; font-size: 14px;">📎 ${newTask.attachmentName}</td></tr>` : ''}
+          </table>
+          <p style="font-size: 13px; color: #6b7280; margin: 20px 0 0 0;">Please log in to the Employee Portal to view details and update your progress.</p>
+        </div>
+        <div style="padding: 16px 32px; background: #f3f4f6; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #9ca3af;">
+          Sent from Cluso Employee Tracker • ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </div>
+      </div>
+    `;
+
+    try {
+      await sendTaskEmail({
+        to: assignedUser.email,
+        toName: assignedUser.name,
+        subject: `📋 New Task: ${newTask.title}`,
+        htmlBody,
+        attachment: attachmentData ? {
+          filename: attachmentData.filename,
+          contentType: attachmentData.contentType,
+          base64Data: attachmentData.base64Data,
+        } : undefined,
+      });
+    } catch (emailErr) {
+      console.error('Task email notification error (non-fatal):', emailErr);
+    }
+  }
 
   return NextResponse.json({ task: newTask });
 }
@@ -131,6 +233,12 @@ export async function DELETE(req) {
   if (filtered.length === tasks.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   await writeData('tasks', filtered);
+
+  // Also remove attachment from MongoDB if any
+  try {
+    const db = await getDb();
+    await db.collection('task_attachments').deleteMany({ taskId: id });
+  } catch {}
 
   await logAdminAction(session, 'DELETE_TASK', 'task', id, {
     title: target?.title,

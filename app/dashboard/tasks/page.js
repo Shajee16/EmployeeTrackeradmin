@@ -1,7 +1,7 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ClipboardList, Plus, Search, MessageSquare, Trash2, ChevronDown } from 'lucide-react';
+import { ClipboardList, Plus, Search, MessageSquare, Trash2, ChevronDown, Paperclip, Download, X } from 'lucide-react';
 
 export default function TaskManagement() {
   const [tasks, setTasks] = useState([]);
@@ -10,8 +10,11 @@ export default function TaskManagement() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ userId: '', title: '', description: '', priority: 'Medium', deadline: '' });
+  const [attachment, setAttachment] = useState(null); // { filename, contentType, data }
   const [commentModal, setCommentModal] = useState(null);
   const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef(null);
 
   const load = () => {
     fetch('/api/admin-tasks').then(r => r.json()).then(d => setTasks(d.tasks || []));
@@ -19,7 +22,9 @@ export default function TaskManagement() {
 
   useEffect(() => {
     load();
+    const poll = setInterval(load, 15000);
     fetch('/api/admin-employees').then(r => r.json()).then(d => setEmployees(d.employees || []));
+    return () => clearInterval(poll);
   }, []);
 
   const filtered = useMemo(() => {
@@ -31,12 +36,54 @@ export default function TaskManagement() {
     });
   }, [tasks, search, statusFilter]);
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.size > 3 * 1024 * 1024) {
+      alert('File exceeds 3 MB limit. Please choose a smaller file.');
+      e.target.value = '';
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAttachment({
+        filename: file.name,
+        contentType: file.type || 'application/octet-stream',
+        data: reader.result, // data:xxx;base64,...
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeAttachment = () => {
+    setAttachment(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
-    await fetch('/api/admin-tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-    setShowCreate(false);
-    setForm({ userId: '', title: '', description: '', priority: 'Medium', deadline: '' });
-    load();
+    setSubmitting(true);
+    try {
+      const payload = { ...form };
+      if (attachment) {
+        payload.attachment = {
+          filename: attachment.filename,
+          contentType: attachment.contentType,
+          data: attachment.data,
+        };
+      }
+      await fetch('/api/admin-tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      setShowCreate(false);
+      setForm({ userId: '', title: '', description: '', priority: 'Medium', deadline: '' });
+      setAttachment(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      load();
+    } catch (err) {
+      console.error('Task creation error:', err);
+    }
+    setSubmitting(false);
   };
 
   const updateStatus = async (id, status) => {
@@ -58,8 +105,34 @@ export default function TaskManagement() {
     load();
   };
 
+  const downloadAttachment = async (taskId, filename) => {
+    try {
+      const res = await fetch(`/api/admin-tasks/attachment?taskId=${taskId}`);
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Attachment not found');
+        return;
+      }
+      // Create download link
+      const link = document.createElement('a');
+      link.href = `data:${data.contentType};base64,${data.base64Data}`;
+      link.download = data.filename || filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      alert('Failed to download attachment');
+    }
+  };
+
   const priorityColor = (p) => p === 'High' ? 'badge-danger' : p === 'Low' ? 'badge-info' : 'badge-warning';
   const statusColor = (s) => s === 'Completed' ? 'badge-success' : s === 'In Progress' ? 'badge-warning' : 'badge-info';
+
+  const formatSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
@@ -102,8 +175,60 @@ export default function TaskManagement() {
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Description</label>
               <textarea rows={3} value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Task details..." />
             </div>
+
+            {/* Attachment Section */}
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                <Paperclip size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                Attachment (Optional, max 3 MB)
+              </label>
+              {!attachment ? (
+                <div
+                  style={{
+                    border: '2px dashed var(--surface-border)', borderRadius: 10, padding: '18px 20px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                    cursor: 'pointer', background: 'var(--bg-secondary)', transition: 'all 0.2s',
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'var(--surface)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                >
+                  <Paperclip size={20} color="var(--text-muted)" />
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    Click to attach a file (PDF, Image, Document, etc.)
+                  </span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp,.zip,.rar"
+                  />
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                  background: 'rgba(99,102,241,0.06)', borderRadius: 10, border: '1.5px solid rgba(99,102,241,0.2)',
+                }}>
+                  <Paperclip size={18} color="#6366f1" />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)' }}>{attachment.filename}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{attachment.contentType}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeAttachment}
+                    style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', fontWeight: 600 }}
+                  >
+                    <X size={14} /> Remove
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Assign Task</button>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={submitting}>
+            {submitting ? '⏳ Assigning & Sending Email...' : 'Assign Task'}
+          </button>
         </motion.form>
       )}
 
@@ -142,6 +267,19 @@ export default function TaskManagement() {
                 <td>
                   <div style={{ fontWeight: 600 }}>{t.title}</div>
                   {t.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{t.description.substring(0, 60)}{t.description.length > 60 ? '...' : ''}</div>}
+                  {t.hasAttachment && (
+                    <button
+                      onClick={() => downloadAttachment(t.id, t.attachmentName)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4,
+                        background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+                        borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+                        color: '#6366f1', fontSize: '0.72rem', fontWeight: 600,
+                      }}
+                    >
+                      <Download size={12} /> {t.attachmentName || 'Download'}
+                    </button>
+                  )}
                 </td>
                 <td>
                   <div style={{ fontWeight: 500 }}>{t.employeeName}</div>
