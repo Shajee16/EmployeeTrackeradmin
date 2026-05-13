@@ -55,6 +55,10 @@ export default function AdminSettingsPage() {
   const saveProfile = async () => {
     setLoading(true);
     await fetch('/api/admin-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'profile', displayName, phone }) });
+    if (displayName) {
+      ctx?.setUser?.(u => ({ ...u, name: displayName }));
+      setUser(u => ({ ...u, name: displayName }));
+    }
     flash('Profile updated!');
     setLoading(false);
   };

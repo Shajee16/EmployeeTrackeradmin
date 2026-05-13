@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, createContext, useContext } from 'react';
-import { ShieldAlert, ShieldCheck, AlertTriangle, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle, X, LogOut, Sun, Moon, ChevronRight, ChevronsLeft, ChevronsRight, Type } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, AlertTriangle, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle, X, LogOut, Sun, Moon, ChevronRight, ChevronsLeft, ChevronsRight, Type, Trophy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoImg from '../logo.png';
 
@@ -22,6 +22,7 @@ const navItems = [
   { icon: AlertTriangle, label: 'Alerts', path: '/dashboard/alerts', desc: 'Issue warnings and critical alerts to employees' },
   { icon: Bell, label: 'Notifications', path: '/dashboard/notifications', desc: 'View system notifications and updates' },
   { icon: ShieldCheck, label: 'Admin Management', path: '/dashboard/admin-management', superOnly: true, desc: 'Manage portal administrators and their roles' },
+  { icon: Trophy, label: 'Leaderboard', path: '/dashboard/leaderboard', desc: 'View employee performance rankings' },
   { icon: Settings, label: 'Settings', path: '/dashboard/settings', desc: 'Configure portal settings and your profile' },
 ];
 
@@ -52,6 +53,9 @@ export default function DashboardLayout({ children }) {
         fetch('/api/admin-settings').then(r => r.json()).then(sd => {
           if (sd.settings?.profilePicture) {
             setUser(u => ({ ...u, profilePicture: sd.settings.profilePicture }));
+          }
+          if (sd.settings?.displayName) {
+            setUser(u => ({ ...u, name: sd.settings.displayName }));
           }
           if (sd.settings?.themeMode) setThemeMode(sd.settings.themeMode);
           if (sd.settings?.themeColor) setThemeColor(sd.settings.themeColor);
@@ -117,7 +121,7 @@ export default function DashboardLayout({ children }) {
   const filteredNav = navItems.filter(item => !item.superOnly || user?.role === 'Super Admin');
 
   return (
-    <ThemeContext.Provider value={{ theme: themeMode, setTheme: setThemeMode, themeColor, setThemeColor }}>
+    <ThemeContext.Provider value={{ theme: themeMode, setTheme: setThemeMode, themeColor, setThemeColor, user, setUser }}>
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-gradient)', backgroundAttachment: 'fixed' }}>
 
         {/* ═══════ MOBILE OVERLAY ═══════ */}
