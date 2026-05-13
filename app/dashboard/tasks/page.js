@@ -17,7 +17,7 @@ export default function TaskManagement() {
   const fileInputRef = useRef(null);
 
   const load = () => {
-    fetch('/api/admin-tasks').then(r => r.json()).then(d => setTasks(d.tasks || []));
+    fetch(`/api/admin-tasks?t=${Date.now()}`).then(r => r.json()).then(d => setTasks(d.tasks || []));
   };
 
   useEffect(() => {
