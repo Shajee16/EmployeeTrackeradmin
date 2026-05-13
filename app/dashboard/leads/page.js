@@ -52,6 +52,17 @@ export default function LeadManagement() {
     }
   };
 
+  const updateLeadField = async (id, field, value) => {
+    await fetch('/api/admin-leads', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, [field]: value })
+    });
+    loadData();
+    if (detailModal && detailModal.id === id) {
+      setDetailModal(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
   const sendReply = async (lead) => {
     if (!replyBody.trim() || !replySubject.trim()) return alert('Subject and Body are required');
     setSending(true);
@@ -354,15 +365,43 @@ export default function LeadManagement() {
                   </div>
                   <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8 }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Status</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{detailModal.status}</div>
+                    <select 
+                      value={detailModal.status || ''} 
+                      onChange={e => updateLeadField(detailModal.id, 'status', e.target.value)}
+                      style={{ fontSize: '0.9rem', fontWeight: 600, width: '100%', border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '4px', borderRadius: '4px' }}>
+                      <option value="New">New</option>
+                      <option value="Contacted">Contacted</option>
+                      <option value="Qualified">Qualified</option>
+                      <option value="Proposal">Proposal</option>
+                      <option value="Negotiation">Negotiation</option>
+                      <option value="Closed">Closed</option>
+                      <option value="Lost">Lost</option>
+                    </select>
                   </div>
                   <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8 }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Deal Value</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>₹{Number(detailModal.dealValue || 0).toLocaleString()}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>₹</span>
+                      <input 
+                        type="number" 
+                        value={detailModal.dealValue || ''} 
+                        onChange={e => updateLeadField(detailModal.id, 'dealValue', e.target.value)}
+                        onBlur={e => updateLeadField(detailModal.id, 'dealValue', e.target.value)}
+                        style={{ fontSize: '0.9rem', fontWeight: 600, width: '100%', border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '4px', borderRadius: '4px' }} 
+                      />
+                    </div>
                   </div>
                   <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8 }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Priority</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{detailModal.priority}</div>
+                    <select 
+                      value={detailModal.priority || ''} 
+                      onChange={e => updateLeadField(detailModal.id, 'priority', e.target.value)}
+                      style={{ fontSize: '0.9rem', fontWeight: 600, width: '100%', border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '4px', borderRadius: '4px' }}>
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
                   </div>
                 </div>
 

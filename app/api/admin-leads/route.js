@@ -157,6 +157,26 @@ export async function PUT(req) {
 
   if (body.notes !== undefined) leads[idx].notes = sanitizeString(body.notes, 2000);
 
+  const allowedFields = ['companyName', 'contactPerson', 'designation', 'phone', 'email', 'address', 'industry', 'companySize', 'servicesInterested', 'source', 'estMonthlyVolume', 'estDealValue', 'priority', 'dealValue', 'nextFollowupDate'];
+  for (const field of allowedFields) {
+    if (body[field] !== undefined) {
+      const oldVal = leads[idx][field];
+      const newVal = typeof body[field] === 'string' ? sanitizeString(body[field], 2000) : body[field];
+      leads[idx][field] = newVal;
+      
+      // Log generic field change if it actually changed
+      if (oldVal !== newVal) {
+        leads[idx].activities = leads[idx].activities || [];
+        leads[idx].activities.push({
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+          type: 'Update',
+          description: `${field} updated by Admin.`,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  }
+
   leads[idx].updatedAt = new Date().toISOString();
   await writeData('leads', leads);
 
