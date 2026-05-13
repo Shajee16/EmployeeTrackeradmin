@@ -42,9 +42,10 @@ export async function POST(req) {
         leads[i].activities = leads[i].activities || [];
         leads[i].activities.push({
           id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-          type: 'Status Change',
+          type: 'Reassignment',
           description: `Bulk reassigned by Admin (from ${oldUserId || 'unassigned'} to ${targetUserId}).`,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          adminOnly: true
         });
         leads[i].updatedAt = new Date().toISOString();
         affected++;

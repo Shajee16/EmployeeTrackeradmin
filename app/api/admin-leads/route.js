@@ -137,9 +137,10 @@ export async function PUT(req) {
     leads[idx].activities = leads[idx].activities || [];
     leads[idx].activities.push({
       id: Date.now().toString(),
-      type: 'Status Change',
+      type: 'Reassignment',
       description: `Lead reassigned by Admin (from ${oldUserId || 'unassigned'} to ${body.userId}).`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      adminOnly: true
     });
   }
   
