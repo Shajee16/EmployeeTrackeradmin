@@ -8,7 +8,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   const db = await getDb();
-  const settings = await db.collection('admin_settings').findOne({ userId: session.id }) || {};
+  const settings = await db.collection('user_settings').findOne({ userId: session.id }) || {};
   const { _id, ...safe } = settings;
   return NextResponse.json({ settings: safe });
 }
@@ -64,7 +64,7 @@ export async function PUT(req) {
     update.notifLoginAlert = body.notifLoginAlert !== false;
   }
 
-  await db.collection('admin_settings').updateOne(
+  await db.collection('user_settings').updateOne(
     { userId: session.id },
     { $set: update },
     { upsert: true }

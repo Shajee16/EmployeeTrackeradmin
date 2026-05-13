@@ -9,7 +9,7 @@ export async function GET() {
   // Overlay the latest display name from settings/admins so UI always shows updated name
   try {
     const db = await getDb();
-    const settings = await db.collection('admin_settings').findOne({ userId: session.id });
+    const settings = await db.collection('user_settings').findOne({ userId: session.id });
     const admin = await db.collection('admins').findOne(
       { $or: [{ email: session.email }, { id: session.id }] },
       { projection: { name: 1, phone: 1 } }
