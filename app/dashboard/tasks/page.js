@@ -14,6 +14,7 @@ export default function TaskManagement() {
   const [commentModal, setCommentModal] = useState(null);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // task to delete
   const fileInputRef = useRef(null);
 
   const load = () => {
@@ -99,8 +100,10 @@ export default function TaskManagement() {
     load();
   };
 
-  const deleteTask = async (id) => {
-    if (!confirm('Delete this task?')) return;
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    const id = deleteConfirm.id;
+    setDeleteConfirm(null);
     try {
       const res = await fetch(`/api/admin-tasks?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -234,7 +237,7 @@ export default function TaskManagement() {
             </div>
           </div>
           <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={submitting}>
-            {submitting ? '⏳ Assigning & Sending Email...' : 'Assign Task'}
+            {submitting ? '⏳ Assigning...' : 'Assign Task'}
           </button>
         </motion.form>
       )}
@@ -307,7 +310,7 @@ export default function TaskManagement() {
                     <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setCommentModal(t)} title="Comment">
                       <MessageSquare size={14} /> {(t.comments?.length || 0)}
                     </button>
-                    <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => deleteTask(t.id)} title="Delete">
+                    <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setDeleteConfirm(t)} title="Delete">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -343,6 +346,25 @@ export default function TaskManagement() {
             <div style={{ display: 'flex', gap: 8 }}>
               <input placeholder="Add a comment..." value={comment} onChange={e => setComment(e.target.value)} style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && addComment()} />
               <button className="btn btn-primary" onClick={addComment}>Send</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }} onClick={() => setDeleteConfirm(null)}>
+          <div className="card" style={{ padding: 28, width: 420, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Trash2 size={28} color="#ef4444" />
+            </div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 8 }}>Delete Task?</h3>
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.5 }}>
+              Are you sure you want to delete <strong>"{deleteConfirm.title}"</strong>? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button className="btn btn-outline" style={{ padding: '10px 24px', fontSize: '0.88rem' }} onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button style={{ padding: '10px 24px', fontSize: '0.88rem', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s' }} onClick={confirmDelete} onMouseEnter={e => e.target.style.background='#dc2626'} onMouseLeave={e => e.target.style.background='#ef4444'}>Delete</button>
             </div>
           </div>
         </div>
