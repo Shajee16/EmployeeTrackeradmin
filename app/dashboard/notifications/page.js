@@ -27,11 +27,13 @@ export default function NotificationsPage() {
   const markAllRead = async () => {
     await fetch('/api/admin-notifications', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markAllRead: true }) });
     setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+    window.dispatchEvent(new Event('notificationsRead'));
   };
 
   const markRead = async (id) => {
     await fetch('/api/admin-notifications', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    window.dispatchEvent(new Event('notificationsRead'));
   };
 
   const displayed = notifs.filter(n => filter === 'all' ? true : filter === 'unread' ? !n.read : n.type === filter);

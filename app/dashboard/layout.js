@@ -47,9 +47,21 @@ export default function DashboardLayout({ children }) {
       else {
         setUser(d.user);
         setLoading(false);
-        fetch('/api/admin-notifications').then(r => r.json()).then(nd => {
+        const fetchUnread = () => fetch('/api/admin-notifications').then(r => r.json()).then(nd => {
           setUnreadCount((nd.notifications || []).filter(n => !n.read).length);
         }).catch(() => {});
+        
+        fetchUnread();
+        
+        const poll = setInterval(fetchUnread, 45000);
+        
+        const handleNotifRead = () => fetchUnread();
+        window.addEventListener('notificationsRead', handleNotifRead);
+        
+        return () => {
+          clearInterval(poll);
+          window.removeEventListener('notificationsRead', handleNotifRead);
+        };
         fetch('/api/admin-settings').then(r => r.json()).then(sd => {
           if (sd.settings?.profilePicture) {
             setUser(u => ({ ...u, profilePicture: sd.settings.profilePicture }));
