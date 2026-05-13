@@ -91,6 +91,11 @@ export default function EmployeesPage() {
     showMsg(`Status changed`); load();
   };
 
+  const toggleLeaderboard = async (id, hide) => {
+    await fetch('/api/admin-employees', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'toggle_leaderboard', hideFromLeaderboard: hide }) });
+    showMsg(hide ? 'Hidden from leaderboard' : 'Visible on leaderboard'); load();
+  };
+
   const removeEmployee = async (id, name) => {
     if (!confirm(`Remove "${name}"?`)) return;
     await fetch(`/api/admin-employees?id=${id}`, { method: 'DELETE' });
@@ -300,6 +305,9 @@ export default function EmployeesPage() {
                                 </button>
                                 <button className="btn btn-outline" style={{ padding: '6px 12px' }} onClick={() => { setEditModal(e); setEditForm({...e, newPassword: ''}); }}>
                                   <Edit size={16} /> Edit
+                                </button>
+                                <button className="btn btn-outline" style={{ padding: '6px 12px', color: e.hideFromLeaderboard ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => toggleLeaderboard(e.id, !e.hideFromLeaderboard)} title={e.hideFromLeaderboard ? "Show on Leaderboard" : "Hide from Leaderboard"}>
+                                  {e.hideFromLeaderboard ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                                 <button className="btn btn-danger" style={{ padding: '6px 12px' }} onClick={() => removeEmployee(e.id, e.name)}>
                                   <UserX size={16} />

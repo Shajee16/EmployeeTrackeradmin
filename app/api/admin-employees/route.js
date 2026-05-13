@@ -167,6 +167,8 @@ export async function PUT(req) {
   
   if (body.action === 'toggle_status') {
     users[idx].status = users[idx].status === 'away' ? 'active' : 'away';
+  } else if (body.action === 'toggle_leaderboard') {
+    users[idx].hideFromLeaderboard = body.hideFromLeaderboard;
   }
 
   // Support editing other fields with sanitization
