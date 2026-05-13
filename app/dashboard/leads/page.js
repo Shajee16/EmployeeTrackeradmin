@@ -217,13 +217,17 @@ export default function LeadManagement() {
   };
 
   // Delete an activity log
-  const deleteActivityLog = async (leadId, activityId) => {
+  const deleteActivityLog = async (leadId, activity) => {
     if (!confirm('Are you sure you want to delete this activity log?')) return;
-    const res = await fetch(`/api/admin-leads/activity?leadId=${leadId}&activityId=${activityId}`, { method: 'DELETE' });
+    const url = `/api/admin-leads/activity?leadId=${leadId}&activityId=${activity.id}&timestamp=${encodeURIComponent(activity.timestamp)}`;
+    const res = await fetch(url, { method: 'DELETE' });
     if (res.ok) {
       loadData();
       if (detailModal && detailModal.id === leadId) {
-        setDetailModal(prev => ({ ...prev, activities: prev.activities.filter(a => a.id !== activityId) }));
+        setDetailModal(prev => ({ 
+          ...prev, 
+          activities: prev.activities.filter(a => activity.id ? a.id !== activity.id : a.timestamp !== activity.timestamp) 
+        }));
       }
     } else {
       alert('Failed to delete activity log');
@@ -561,7 +565,7 @@ export default function LeadManagement() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(a.timestamp).toLocaleString()}</span>
                             <button 
-                              onClick={() => deleteActivityLog(detailModal.id, a.id)}
+                              onClick={() => deleteActivityLog(detailModal.id, a)}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex' }}
                               title="Delete log"
                             >

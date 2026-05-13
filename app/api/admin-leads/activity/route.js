@@ -11,9 +11,10 @@ export async function DELETE(req) {
   const { searchParams } = new URL(req.url);
   const leadId = sanitizeString(searchParams.get('leadId'), 50);
   const activityId = sanitizeString(searchParams.get('activityId'), 50);
+  const activityTimestamp = searchParams.get('timestamp');
 
-  if (!leadId || !activityId) {
-    return NextResponse.json({ error: 'Missing leadId or activityId' }, { status: 400 });
+  if (!leadId) {
+    return NextResponse.json({ error: 'Missing leadId' }, { status: 400 });
   }
 
   const leads = await readData('leads');
@@ -24,7 +25,13 @@ export async function DELETE(req) {
   }
 
   if (leads[idx].activities) {
-    leads[idx].activities = leads[idx].activities.filter(a => a.id !== activityId);
+    if (activityId && activityId !== 'undefined') {
+      leads[idx].activities = leads[idx].activities.filter(a => a.id !== activityId);
+    } else if (activityTimestamp) {
+      // Fallback for older logs without IDs
+      leads[idx].activities = leads[idx].activities.filter(a => a.timestamp !== activityTimestamp);
+    }
+    
     leads[idx].updatedAt = new Date().toISOString();
     await writeData('leads', leads);
   }
