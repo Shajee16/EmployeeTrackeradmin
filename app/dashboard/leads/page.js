@@ -25,6 +25,10 @@ export default function LeadManagement() {
   const [saving, setSaving] = useState(false);
   const [saveFlash, setSaveFlash] = useState('');
   const [adminComment, setAdminComment] = useState('');
+  
+  // Bulk selection state
+  const [selectedLeads, setSelectedLeads] = useState([]);
+  const [bulkReassignTarget, setBulkReassignTarget] = useState('');
 
   const loadData = async () => {
     try {
@@ -172,6 +176,60 @@ export default function LeadManagement() {
     else alert('Failed to process request');
   };
 
+  // Bulk Actions
+  const toggleLeadSelection = (leadId) => {
+    setSelectedLeads(prev => prev.includes(leadId) ? prev.filter(id => id !== leadId) : [...prev, leadId]);
+  };
+
+  const toggleAllLeads = (leadList) => {
+    const allSelected = leadList.every(l => selectedLeads.includes(l.id));
+    if (allSelected) {
+      setSelectedLeads(prev => prev.filter(id => !leadList.some(l => l.id === id)));
+    } else {
+      const toAdd = leadList.filter(l => !selectedLeads.includes(l.id)).map(l => l.id);
+      setSelectedLeads(prev => [...prev, ...toAdd]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Permanently delete ${selectedLeads.length} leads?\nThis action cannot be undone.`)) return;
+    const res = await fetch('/api/admin-leads/bulk-action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', leadIds: selectedLeads })
+    });
+    if (res.ok) {
+      setSelectedLeads([]);
+      loadData();
+    } else alert('Failed to delete leads');
+  };
+
+  const handleBulkReassign = async () => {
+    if (!bulkReassignTarget) return alert('Select an employee to reassign to');
+    const res = await fetch('/api/admin-leads/bulk-action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reassign', leadIds: selectedLeads, targetUserId: bulkReassignTarget })
+    });
+    if (res.ok) {
+      setSelectedLeads([]);
+      setBulkReassignTarget('');
+      loadData();
+    } else alert('Failed to reassign leads');
+  };
+
+  // Delete an activity log
+  const deleteActivityLog = async (leadId, activityId) => {
+    if (!confirm('Are you sure you want to delete this activity log?')) return;
+    const res = await fetch(`/api/admin-leads/activity?leadId=${leadId}&activityId=${activityId}`, { method: 'DELETE' });
+    if (res.ok) {
+      loadData();
+      if (detailModal && detailModal.id === leadId) {
+        setDetailModal(prev => ({ ...prev, activities: prev.activities.filter(a => a.id !== activityId) }));
+      }
+    } else {
+      alert('Failed to delete activity log');
+    }
+  };
+
   const pendingDeletionRequests = deletionRequests.filter(r => r.status === 'pending');
 
   const statuses = [...new Set(leads.map(l => l.status).filter(Boolean))];
@@ -249,7 +307,7 @@ export default function LeadManagement() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters & Bulk Actions */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 24 }}>
         <div className="card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <Search size={18} color="var(--text-muted)" />
@@ -265,6 +323,25 @@ export default function LeadManagement() {
           </select>
         </div>
       </div>
+
+      {selectedLeads.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          style={{ padding: '12px 20px', background: 'var(--surface)', border: '1px solid var(--primary)', borderRadius: 12, marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 15px rgba(99,102,241,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{selectedLeads.length} leads selected</div>
+            <button onClick={() => setSelectedLeads([])} className="btn btn-sm btn-outline" style={{ fontSize: '0.75rem' }}>Clear Selection</button>
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <select value={bulkReassignTarget} onChange={e => setBulkReassignTarget(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--bg-secondary)', color: 'var(--text)', fontSize: '0.8rem', outline: 'none' }}>
+              <option value="">Select Employee to Reassign...</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+            <button onClick={handleBulkReassign} disabled={!bulkReassignTarget} className="btn btn-sm btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><UserPlus size={14}/> Bulk Reassign</button>
+            <button onClick={handleBulkDelete} className="btn btn-sm" style={{ background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 6 }}><Trash2 size={14}/> Bulk Delete</button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Grouped Leads */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -310,6 +387,12 @@ export default function LeadManagement() {
                                 <table style={{ marginTop: 12 }}>
                                   <thead>
                                     <tr>
+                                      <th style={{ width: 40, padding: '8px 12px' }}>
+                                        <input type="checkbox"
+                                          checked={groupedData[dept][emp].length > 0 && groupedData[dept][emp].every(l => selectedLeads.includes(l.id))}
+                                          onChange={() => toggleAllLeads(groupedData[dept][emp])}
+                                        />
+                                      </th>
                                       <th style={{ fontSize: '0.75rem', padding: '8px 12px' }}>Company / Contact</th>
                                       <th style={{ fontSize: '0.75rem', padding: '8px 12px' }}>Value</th>
                                       <th style={{ fontSize: '0.75rem', padding: '8px 12px' }}>Priority</th>
@@ -319,7 +402,10 @@ export default function LeadManagement() {
                                   </thead>
                                   <tbody>
                                     {groupedData[dept][emp].map(l => (
-                                      <tr key={l.id}>
+                                      <tr key={l.id} style={{ background: selectedLeads.includes(l.id) ? 'rgba(99,102,241,0.05)' : 'transparent' }}>
+                                        <td style={{ padding: '8px 12px' }}>
+                                          <input type="checkbox" checked={selectedLeads.includes(l.id)} onChange={() => toggleLeadSelection(l.id)} />
+                                        </td>
                                         <td style={{ padding: '8px 12px' }}>
                                           <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{l.companyName}</div>
                                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{l.contactPerson}</div>
@@ -469,10 +555,19 @@ export default function LeadManagement() {
                 {detailModal.activities && detailModal.activities.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {detailModal.activities.map((a, i) => (
-                      <div key={i} style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8, fontSize: '0.85rem', borderLeft: '3px solid var(--primary)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <div key={i} style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8, fontSize: '0.85rem', borderLeft: '3px solid var(--primary)', position: 'relative' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'center' }}>
                           <span style={{ fontWeight: 600 }}>{a.type}</span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(a.timestamp).toLocaleString()}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(a.timestamp).toLocaleString()}</span>
+                            <button 
+                              onClick={() => deleteActivityLog(detailModal.id, a.id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex' }}
+                              title="Delete log"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </div>
                         <p style={{ color: 'var(--text-muted)', margin: 0 }}>{a.description}</p>
                       </div>
