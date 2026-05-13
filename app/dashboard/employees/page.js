@@ -1,7 +1,7 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserX, Power, UserPlus, Edit, Eye, EyeOff, X, Check, AlertCircle, Activity, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, UserX, Power, UserPlus, Edit, Eye, EyeOff, X, Check, AlertCircle, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Circle } from 'lucide-react';
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState([]);
@@ -26,6 +26,11 @@ export default function EmployeesPage() {
   const [detailModal, setDetailModal] = useState(null);
   const [activityDateFilter, setActivityDateFilter] = useState('');
 
+  // Live online status
+  const [onlineMap, setOnlineMap] = useState({});
+  const [onlineFilter, setOnlineFilter] = useState(''); // '' | 'online' | 'offline'
+  const pollRef = useRef(null);
+
   const load = () => {
     fetch('/api/admin-employees').then(r => r.json()).then(d => setEmployees(d.employees || []));
     fetch('/api/admin-departments').then(r => r.json()).then(d => {
@@ -39,6 +44,21 @@ export default function EmployeesPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Poll online status every 15 seconds
+  const fetchOnlineStatus = async () => {
+    try {
+      const res = await fetch('/api/admin-employees/online-status');
+      const data = await res.json();
+      if (data.online) setOnlineMap(data.online);
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchOnlineStatus();
+    pollRef.current = setInterval(fetchOnlineStatus, 15000);
+    return () => clearInterval(pollRef.current);
+  }, []);
 
   const showMsg = (msg, isError = false) => {
     if (isError) { setError(msg); setTimeout(() => setError(''), 4000); }
@@ -98,11 +118,18 @@ export default function EmployeesPage() {
     setExpandedDepts(prev => ({ ...prev, [dept]: !prev[dept] }));
   };
 
+  const onlineCount = useMemo(() => {
+    return employees.filter(e => onlineMap[e.id]).length;
+  }, [employees, onlineMap]);
+
   // Grouping
   const filteredGroups = useMemo(() => {
     const s = search.toLowerCase();
     const result = employees.filter(e => {
-      return ((e.name || '').toLowerCase().includes(s) || (e.email || '').toLowerCase().includes(s)) && (deptFilter ? e.department === deptFilter : true);
+      const matchesSearch = ((e.name || '').toLowerCase().includes(s) || (e.email || '').toLowerCase().includes(s));
+      const matchesDept = deptFilter ? e.department === deptFilter : true;
+      const matchesOnline = onlineFilter === 'online' ? !!onlineMap[e.id] : onlineFilter === 'offline' ? !onlineMap[e.id] : true;
+      return matchesSearch && matchesDept && matchesOnline;
     });
     
     const groups = {};
@@ -112,7 +139,7 @@ export default function EmployeesPage() {
       groups[dept].push(emp);
     });
     return groups;
-  }, [employees, search, deptFilter]);
+  }, [employees, search, deptFilter, onlineFilter, onlineMap]);
 
   const departments = savedDepartments.map(d => d.name);
   const activeCount = employees.filter(e => e.status !== 'away').length;
@@ -153,7 +180,13 @@ export default function EmployeesPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h2 style={{ fontSize: '1.8rem', fontWeight: 800 }}>Employee Management</h2>
-          <p style={{ color: 'var(--text-muted)' }}>{employees.length} total • {activeCount} active</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, color: 'var(--text-muted)' }}>
+            <span>{employees.length} total • {activeCount} active</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 6px rgba(34,197,94,0.5)', animation: 'pulse-dot 2s infinite' }} />
+              <span style={{ fontWeight: 600, color: '#22c55e' }}>{onlineCount} online now</span>
+            </span>
+          </div>
         </div>
         <button className="btn btn-primary" onClick={() => setShowCreate(!showCreate)}>
           <UserPlus size={18} /> Add Employee
@@ -166,14 +199,19 @@ export default function EmployeesPage() {
       </AnimatePresence>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
-        <div className="card" style={{ display: 'flex', alignItems: 'center', flex: 1, padding: '0 16px' }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+        <div className="card" style={{ display: 'flex', alignItems: 'center', flex: 1, padding: '0 16px', minWidth: 200 }}>
           <Search size={18} color="var(--text-muted)" />
           <input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ border: 'none', background: 'transparent' }} />
         </div>
-        <select className="card" value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={{ width: 250, padding: '12px 16px', border: 'none' }}>
+        <select className="card" value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={{ width: 200, padding: '12px 16px', border: 'none' }}>
           <option value="">All Departments</option>
           {departments.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select className="card" value={onlineFilter} onChange={e => setOnlineFilter(e.target.value)} style={{ width: 180, padding: '12px 16px', border: 'none' }}>
+          <option value="">All Status</option>
+          <option value="online">🟢 Online Only</option>
+          <option value="offline">⚫ Offline Only</option>
         </select>
         <button className="btn btn-outline card" onClick={() => setShowDeptModal(true)}>Manage Depts</button>
       </div>
@@ -198,15 +236,58 @@ export default function EmployeesPage() {
                   <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <tbody>
-                        {emps.map(e => (
+                        {emps.map(e => {
+                          const isOnline = !!onlineMap[e.id];
+                          const onlineInfo = onlineMap[e.id];
+                          return (
                           <tr key={e.id} style={{ borderBottom: '1px solid var(--surface-border)', opacity: e.status === 'away' ? 0.6 : 1 }}>
                             <td style={{ padding: '16px 20px' }}>
-                              <div style={{ fontWeight: 600, fontSize: '1rem' }}>{e.name}</div>
-                              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{e.id ? <span style={{fontWeight: 600}}>{e.id}</span> : ''} {e.id ? '•' : ''} {e.email}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                {/* Online indicator dot */}
+                                <div style={{ position: 'relative', flexShrink: 0 }}>
+                                  <div style={{
+                                    width: 10, height: 10, borderRadius: '50%',
+                                    background: isOnline ? '#22c55e' : '#6b7280',
+                                    boxShadow: isOnline ? '0 0 8px rgba(34,197,94,0.6)' : 'none',
+                                    transition: 'all 0.3s ease',
+                                  }} />
+                                  {isOnline && (
+                                    <div style={{
+                                      position: 'absolute', inset: -3,
+                                      borderRadius: '50%',
+                                      border: '2px solid rgba(34,197,94,0.4)',
+                                      animation: 'online-ring 2s ease-in-out infinite',
+                                    }} />
+                                  )}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 600, fontSize: '1rem' }}>{e.name}</div>
+                                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{e.id ? <span style={{fontWeight: 600}}>{e.id}</span> : ''} {e.id ? '•' : ''} {e.email}</div>
+                                </div>
+                              </div>
                             </td>
                             <td style={{ padding: '16px 20px', color: 'var(--text-muted)' }}>{e.designation || e.role}</td>
                             <td style={{ padding: '16px 20px' }}>
-                              <span className={`badge ${e.status === 'away' ? 'badge-warning' : 'badge-success'}`}>{e.status === 'away' ? 'Away' : 'Active'}</span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <span className={`badge ${e.status === 'away' ? 'badge-warning' : 'badge-success'}`}>{e.status === 'away' ? 'Away' : 'Active'}</span>
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                                  padding: '3px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700,
+                                  background: isOnline ? 'rgba(34,197,94,0.12)' : 'rgba(107,114,128,0.1)',
+                                  color: isOnline ? '#22c55e' : '#6b7280',
+                                  border: `1px solid ${isOnline ? 'rgba(34,197,94,0.25)' : 'rgba(107,114,128,0.15)'}`,
+                                  letterSpacing: '0.02em',
+                                  width: 'fit-content',
+                                }}>
+                                  {isOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
+                                  {isOnline ? 'Online' : 'Offline'}
+                                </span>
+                                {isOnline && onlineInfo && (
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                    since {new Date(onlineInfo.loginTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -222,7 +303,8 @@ export default function EmployeesPage() {
                               </div>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </motion.div>
@@ -579,6 +661,19 @@ export default function EmployeesPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Keyframe animations for online status indicators */}
+      <style>{`
+        @keyframes online-ring {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.6); opacity: 0; }
+          100% { transform: scale(1); opacity: 0; }
+        }
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
     </motion.div>
   );
 }
