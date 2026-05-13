@@ -25,7 +25,11 @@ export default function AdminManagementPage() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const poll = setInterval(load, 15000);
+    return () => clearInterval(poll);
+  }, []);
 
   const createAdmin = async (e) => {
     e.preventDefault();

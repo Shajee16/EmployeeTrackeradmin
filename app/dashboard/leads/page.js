@@ -49,7 +49,11 @@ export default function LeadManagement() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+    const poll = setInterval(loadData, 15000);
+    return () => clearInterval(poll);
+  }, []);
 
   const updateStatus = async (id, status) => {
     await fetch('/api/admin-leads', {

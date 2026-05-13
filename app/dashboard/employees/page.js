@@ -43,7 +43,11 @@ export default function EmployeesPage() {
     });
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const poll = setInterval(load, 15000);
+    return () => clearInterval(poll);
+  }, []);
 
   // Poll online status every 15 seconds
   const fetchOnlineStatus = async () => {

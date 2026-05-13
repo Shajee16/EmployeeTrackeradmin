@@ -41,7 +41,11 @@ export default function AttendancePage() {
     fetch('/api/admin-leaves').then(r => r.json()).then(d => setLeaves(d.leaves || []));
     fetch('/api/admin-holidays').then(r => r.json()).then(d => setHolidays(d.holidays || [])).catch(() => {});
   };
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    const poll = setInterval(fetchData, 15000);
+    return () => clearInterval(poll);
+  }, []);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayPresent = attendance.filter(a => a.date === todayStr && a.status === 'Present').length;

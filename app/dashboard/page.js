@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { motion } from 'framer-motion';
 import { Download, UserPlus, Users, ClipboardList, FileText, MessageSquare, CalendarCheck, Target, TrendingUp, Briefcase, CheckCircle2, ArrowUpRight } from 'lucide-react';
@@ -12,9 +12,14 @@ const cardAnim = {
 
 export default function StrategicCommand() {
   const [data, setData] = useState(null);
+  const pollRef = useRef(null);
+
+  const fetchDashboard = () => fetch('/api/admin-dashboard').then(r => r.json()).then(setData).catch(() => {});
 
   useEffect(() => {
-    fetch('/api/admin-dashboard').then(r => r.json()).then(setData);
+    fetchDashboard();
+    pollRef.current = setInterval(fetchDashboard, 15000);
+    return () => clearInterval(pollRef.current);
   }, []);
 
   if (!data) return (
