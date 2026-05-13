@@ -192,11 +192,11 @@ export default function AttendancePage() {
                                     <Users size={16} color="var(--text-muted)" />
                                     <span style={{ fontSize: '0.95rem', fontWeight: 600 }}>{emp}</span>
                                   </div>
-                                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    <span>{presentDays} present</span>
-                                    <span>{Math.round(totalHrs * 10) / 10}h total</span>
-                                    <span>{records.length} days</span>
-                                  </div>
+                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                      <span>{presentDays} present</span>
+                                      <span>{Math.floor(totalHrs)}h {Math.round((totalHrs - Math.floor(totalHrs)) * 60)}m total</span>
+                                      <span>{records.length} days</span>
+                                    </div>
                                 </div>
 
                                 {/* Day-wise calendar */}
@@ -243,7 +243,7 @@ export default function AttendancePage() {
                                                     <td style={{ padding: '8px 10px', color: isWeekend ? '#94a3b8' : 'var(--text)' }}>{getDayName(r.date)}</td>
                                                     <td style={{ padding: '8px 10px' }}>{r.loginTime || '-'}</td>
                                                     <td style={{ padding: '8px 10px' }}>{r.logoutTime || '-'}</td>
-                                                    <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.totalHours ? `${r.totalHours}h` : '-'}</td>
+                                                    <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.totalHours ? `${Math.floor(r.totalHours)}h ${Math.round((r.totalHours - Math.floor(r.totalHours)) * 60)}m` : '-'}</td>
                                                     <td style={{ padding: '8px 10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{r.workMode || '-'}</td>
                                                     <td style={{ padding: '8px 10px' }}><span style={statusBadge(r.status)}>{r.status}</span></td>
                                                   </tr>
