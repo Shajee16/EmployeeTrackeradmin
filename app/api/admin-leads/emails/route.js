@@ -41,7 +41,8 @@ export async function POST(req) {
 
   let body;
   try {
-    body = sanitizeInput(await req.json());
+    // Avoid sanitizeInput on whole body to preserve base64 attachments
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
@@ -55,10 +56,19 @@ export async function POST(req) {
   const emailBody = sanitizeString(body.body || '', 10000);
   const onBehalfOfUserId = sanitizeString(body.onBehalfOfUserId || '', 50);
 
+  let attachments = [];
+  if (Array.isArray(body.attachments)) {
+    attachments = body.attachments.map(att => ({
+      name: sanitizeString(att.name || 'attachment', 200),
+      type: sanitizeString(att.type || 'application/octet-stream', 100),
+      contentBytes: typeof att.contentBytes === 'string' ? att.contentBytes.replace(/[^A-Za-z0-9+/=]/g, '') : '',
+    })).filter(a => a.contentBytes.length > 0);
+  }
+
   // Send via Graph API
   let sendResult;
   try {
-    sendResult = await sendEmail({ to: toEmail, toName, subject, body: emailBody });
+    sendResult = await sendEmail({ to: toEmail, toName, subject, body: emailBody, attachments });
   } catch (err) {
     sendResult = { success: false, error: err.message };
   }
@@ -74,6 +84,7 @@ export async function POST(req) {
     subject: subject,
     body: emailBody,
     template: '',
+    attachmentCount: attachments.length,
     status: sendResult.success ? 'Delivered' : 'Failed',
     sendError: sendResult.error || null,
     sentAt: new Date().toISOString(),

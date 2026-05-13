@@ -15,6 +15,7 @@ export default function LeadManagement() {
   const [expandedEmps, setExpandedEmps] = useState({});
   const [replyBody, setReplyBody] = useState('');
   const [replySubject, setReplySubject] = useState('');
+  const [replyAttachments, setReplyAttachments] = useState([]);
   const [sending, setSending] = useState(false);
   const [reassignModal, setReassignModal] = useState(null);
   const [reassignTarget, setReassignTarget] = useState('');
@@ -29,6 +30,12 @@ export default function LeadManagement() {
   // Bulk selection state
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [bulkReassignTarget, setBulkReassignTarget] = useState('');
+
+  const templates = {
+    'Follow-up': { subject: 'Following Up - {company}', body: 'Hi {name},\n\nJust following up on our previous conversation. Would you be available for a quick call this week?\n\nLooking forward to hearing from you.\n\nBest regards' },
+    'Introduction': { subject: 'Introduction - Our Services', body: 'Hello {name},\n\nIt was great connecting with you. I wanted to introduce our company and how we can help {company} achieve its goals.\n\nWould love to schedule a brief meeting at your convenience.\n\nBest regards' },
+    'Proposal': { subject: 'Proposal - {company}', body: 'Dear {name},\n\nPlease find attached our proposal for {company}. We have carefully tailored it based on our discussions.\n\nPlease let us know if you have any questions.\n\nWarm regards' },
+  };
 
   const loadData = async () => {
     try {
@@ -133,11 +140,13 @@ export default function LeadManagement() {
           subject: replySubject,
           body: replyBody,
           onBehalfOfUserId: lead.userId,
+          attachments: replyAttachments,
         })
       });
       if (res.ok) {
         setReplyBody('');
         setReplySubject('');
+        setReplyAttachments([]);
         loadData();
         alert('Email sent successfully on behalf of employee.');
       } else {
@@ -148,6 +157,49 @@ export default function LeadManagement() {
       alert('Error sending email');
     }
     setSending(false);
+  };
+
+  };
+
+  const handleAttachment = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    
+    const MAX_SIZE = 3 * 1024 * 1024; // 3MB
+    let currentSize = replyAttachments.reduce((acc, att) => acc + (att.size || 0), 0);
+    
+    const newAttachments = [];
+    for (const file of files) {
+      if (currentSize + file.size > MAX_SIZE) {
+        alert(`Adding ${file.name} would exceed the 3MB total attachment limit.`);
+        continue;
+      }
+      
+      const contentBytes = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target.result.split(',')[1]);
+        reader.readAsDataURL(file);
+      });
+      
+      newAttachments.push({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        contentBytes,
+        size: file.size
+      });
+      currentSize += file.size;
+    }
+    
+    setReplyAttachments(prev => [...prev, ...newAttachments]);
+    e.target.value = '';
+  };
+
+  const removeAttachment = (index) => {
+    setReplyAttachments(prev => {
+      const atts = [...prev];
+      atts.splice(index, 1);
+      return atts;
+    });
   };
 
   // Delete lead (admin)
@@ -667,8 +719,21 @@ export default function LeadManagement() {
 
                 {/* Reply Box */}
                 <div style={{ padding: 20, background: 'var(--surface)', borderTop: '1px solid var(--surface-border)' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
-                    Reply on behalf of {detailModal.assignedAsset}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                      Reply on behalf of {detailModal.assignedAsset}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {Object.keys(templates).map(t => (
+                        <button key={t} onClick={() => {
+                          const tmpl = templates[t];
+                          setReplySubject(tmpl.subject.replace('{company}', detailModal.companyName).replace('{name}', detailModal.contactPerson));
+                          setReplyBody(tmpl.body.replace(/{company}/g, detailModal.companyName).replace(/{name}/g, detailModal.contactPerson));
+                        }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: 12, border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer' }}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <input
                     placeholder="Subject"
@@ -681,8 +746,39 @@ export default function LeadManagement() {
                     value={replyBody}
                     onChange={e => setReplyBody(e.target.value)}
                     rows={4}
-                    style={{ width: '100%', padding: '12px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.85rem', resize: 'none', marginBottom: 12, outline: 'none' }}
+                    style={{ width: '100%', padding: '12px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.85rem', resize: 'none', marginBottom: 8, outline: 'none' }}
                   />
+                  
+                  {/* Attachments */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <label className="btn btn-sm btn-outline" style={{ cursor: 'pointer', margin: 0, padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        📎 Add Attachments
+                        <input type="file" multiple onChange={handleAttachment} style={{ display: 'none' }} />
+                      </label>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        {(replyAttachments.reduce((a, b) => a + (b.size || 0), 0) / (1024 * 1024)).toFixed(2)} MB / 3.00 MB
+                      </span>
+                    </div>
+                  </div>
+
+                  {replyAttachments.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                      {replyAttachments.map((att, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '2px 8px', background: 'var(--bg-secondary)',
+                          border: '1px solid var(--surface-border)', borderRadius: 20,
+                          fontSize: '0.7rem'
+                        }}>
+                          <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.name}>{att.name}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>({(att.size / 1024).toFixed(0)} KB)</span>
+                          <button onClick={() => removeAttachment(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.85rem', padding: 0 }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button 
                       className="btn btn-primary" 
