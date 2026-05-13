@@ -159,8 +159,6 @@ export default function LeadManagement() {
     setSending(false);
   };
 
-  };
-
   const handleAttachment = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
