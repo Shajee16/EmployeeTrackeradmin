@@ -27,8 +27,6 @@ export default function AdminManagementPage() {
 
   useEffect(() => {
     load();
-    const poll = setInterval(load, 15000);
-    return () => clearInterval(poll);
   }, []);
 
   const createAdmin = async (e) => {
