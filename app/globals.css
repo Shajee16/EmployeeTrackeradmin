@@ -276,6 +276,26 @@ input, select, textarea {
   backdrop-filter: blur(12px);
 }
 
+/* Restore checkbox & radio native appearance */
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: auto;
+  appearance: auto;
+  width: auto;
+  padding: 0;
+  backdrop-filter: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--primary);
+  border-radius: 4px;
+}
+
 select {
   cursor: pointer;
   padding-right: 2rem;

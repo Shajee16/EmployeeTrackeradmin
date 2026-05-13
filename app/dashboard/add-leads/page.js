@@ -7,7 +7,7 @@ const EXPECTED_COLUMNS = [
   { field: 'Contact Person', key: 'contactPerson', required: true, example: 'Rahul Sharma' },
   { field: 'Designation', key: 'designation', required: false, example: 'HR Manager' },
   { field: 'Phone', key: 'phone', required: true, example: '+91 98765 43210' },
-  { field: 'Email', key: 'email', required: false, example: 'rahul@tcs.com' },
+  { field: 'Email', key: 'email', required: true, example: 'rahul@tcs.com' },
   { field: 'Address', key: 'address', required: false, example: 'Mumbai, India' },
   { field: 'Industry', key: 'industry', required: false, example: 'IT/Software' },
   { field: 'Company Size', key: 'companySize', required: false, example: '201-500' },
@@ -40,6 +40,8 @@ export default function BulkLeadsPage() {
   const [parseError, setParseError] = useState('');
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [assignEmployee, setAssignEmployee] = useState('');
+  const [previewPage, setPreviewPage] = useState(1);
+  const ROWS_PER_PAGE = 50;
 
   // Single lead form
   const [form, setForm] = useState({ companyName: '', contactPerson: '', designation: '', phone: '', email: '', address: '', industry: '', companySize: '', source: 'Admin Assigned', priority: 'Medium', status: 'New', notes: '', assignToEmployeeId: '' });
@@ -61,6 +63,7 @@ export default function BulkLeadsPage() {
   const submitLead = async (e) => {
     e.preventDefault();
     if (!form.companyName) return flash('Company name is required', 'error');
+    if (!form.email) return flash('Email is required', 'error');
     setSubmitting(true);
     const res = await fetch('/api/admin-leads', {
       method: 'POST',
@@ -162,10 +165,52 @@ export default function BulkLeadsPage() {
     XLSX.writeFile(wb, 'Cluso_Leads_Template.xlsx');
   };
 
-  const resetBulk = () => { setBulkStep('format'); setBulkFile(null); setBulkHeaders([]); setBulkRows([]); setBulkResults(null); setParseError(''); setCsvErrors([]); setSelectedRows(new Set()); setAssignEmployee(''); };
+  const resetBulk = () => { setBulkStep('format'); setBulkFile(null); setBulkHeaders([]); setBulkRows([]); setBulkResults(null); setParseError(''); setCsvErrors([]); setSelectedRows(new Set()); setAssignEmployee(''); setPreviewPage(1); };
 
   const toggleRow = (i) => { setSelectedRows(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; }); };
   const toggleAllRows = () => { setSelectedRows(prev => prev.size === bulkRows.length ? new Set() : new Set(bulkRows.map((_, i) => i))); };
+
+  // Assign only the selected leads, remove them from preview, keep unselected
+  const assignSelectedLeads = async () => {
+    if (!assignEmployee) { flash('Please select an employee to assign leads to', 'error'); return; }
+    if (selectedRows.size === 0) { flash('Please select at least one lead to assign', 'error'); return; }
+    setImporting(true);
+    try {
+      const rowsToUpload = bulkRows.filter((_, i) => selectedRows.has(i));
+      const leadsArr = rowsToUpload.map(row => {
+        const obj = {};
+        bulkHeaders.forEach((h, i) => { obj[headerToKey(h)] = row[i] || ''; });
+        const emp = employees.find(e => e.id === assignEmployee);
+        if (emp) obj.assignToEmail = emp.email;
+        return obj;
+      });
+      const res = await fetch('/api/admin-leads/bulk-import', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads: leadsArr }),
+      });
+      const data = await res.json();
+      if (!res.ok) { flash(data.error || 'Assignment failed', 'error'); }
+      else {
+        const remaining = bulkRows.filter((_, i) => !selectedRows.has(i));
+        const assignedCount = data.imported || rowsToUpload.length;
+        const empName = employees.find(e => e.id === assignEmployee)?.name || 'employee';
+        flash(`${assignedCount} lead${assignedCount > 1 ? 's' : ''} assigned to ${empName}!`);
+        setBulkRows(remaining);
+        setSelectedRows(new Set());
+        setAssignEmployee('');
+        setPreviewPage(1);
+        load();
+        if (remaining.length === 0) {
+          setBulkResults({ totalProcessed: leadsArr.length, successCount: data.imported || 0, skippedCount: 0, errorCount: data.errors?.length || 0, errors: data.errors || [] });
+          setBulkStep('results');
+        }
+      }
+    } catch (err) { flash('Network error during assignment.', 'error'); }
+    setImporting(false);
+  };
+
+  const totalPages = Math.ceil(bulkRows.length / ROWS_PER_PAGE);
+  const pagedRows = bulkRows.slice((previewPage - 1) * ROWS_PER_PAGE, previewPage * ROWS_PER_PAGE);
 
   const card = { background: 'var(--surface)', border: '1px solid var(--surface-border)', borderRadius: 16, padding: 24 };
   const inp = { width: '100%', padding: '9px 13px', background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)', borderRadius: 9, color: 'var(--text)', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit' };
@@ -222,9 +267,9 @@ export default function BulkLeadsPage() {
               {[
                 { key: 'companyName', label: 'Company Name *', placeholder: 'Acme Corp' },
                 { key: 'contactPerson', label: 'Contact Person', placeholder: 'John Doe' },
-                { key: 'designation', label: 'Designation', placeholder: 'Manager' },
+                { key: 'email', label: 'Email *', placeholder: 'contact@company.com' },
                 { key: 'phone', label: 'Phone', placeholder: '9876543210' },
-                { key: 'email', label: 'Email', placeholder: 'contact@company.com' },
+                { key: 'designation', label: 'Designation', placeholder: 'Manager' },
                 { key: 'industry', label: 'Industry', placeholder: 'Technology' },
                 { key: 'address', label: 'Address', placeholder: 'City, State' },
                 { key: 'companySize', label: 'Company Size', placeholder: '50-200' },
@@ -384,15 +429,17 @@ export default function BulkLeadsPage() {
             </>
           )}
 
+
           {/* ═══ STEP 2: PREVIEW ═══ */}
           {bulkStep === 'preview' && (
             <>
+              {/* Header bar */}
               <div style={{ ...card, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                 <div>
-                  <h3 style={{ fontWeight: 700, fontSize: '1.05rem', margin: 0 }}>📋 Preview — {bulkFile?.name}</h3>
+                  <h3 style={{ fontWeight: 700, fontSize: '1.05rem', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>📋 Preview — {bulkFile?.name}</h3>
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: 4 }}>
-                    {bulkRows.length} leads found • {bulkHeaders.length} columns detected
-                    {selectedRows.size > 0 && <span style={{ color: 'var(--primary)', fontWeight: 600 }}> • {selectedRows.size} selected</span>}
+                    <strong style={{ color: 'var(--text)' }}>{bulkRows.length}</strong> leads remaining • {bulkHeaders.length} columns
+                    {selectedRows.size > 0 && <span style={{ color: 'var(--primary)', fontWeight: 700 }}> • {selectedRows.size} selected</span>}
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -402,81 +449,162 @@ export default function BulkLeadsPage() {
                     background: 'linear-gradient(135deg, #6366f1, #7c3aed)', boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
                     opacity: importing ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 8,
                   }}>
-                    {importing ? '⏳ Uploading...' : `🚀 Upload ${selectedRows.size > 0 ? selectedRows.size : bulkRows.length} Leads`}
+                    {importing ? '⏳ Uploading...' : `🚀 Upload All ${bulkRows.length} Leads`}
                   </button>
                 </div>
               </div>
 
-              {/* Assign to Employee bar */}
-              <div style={{ ...card, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '16px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <UserCheck size={18} color="var(--primary)" />
-                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>Assign {selectedRows.size > 0 ? `${selectedRows.size} selected` : 'all'} leads to:</span>
+              {/* ── Assign to Employee Panel ── */}
+              <div style={{
+                ...card, marginBottom: 20, padding: '18px 22px',
+                background: assignEmployee ? 'linear-gradient(135deg, rgba(16,185,129,0.06), rgba(99,102,241,0.04))' : 'var(--surface)',
+                border: assignEmployee ? '1.5px solid rgba(16,185,129,0.25)' : '1px solid var(--surface-border)',
+                transition: 'all 0.3s ease',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, var(--primary), var(--accent))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <UserCheck size={18} color="#fff" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>Assign Leads to Employee</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      {selectedRows.size > 0
+                        ? `${selectedRows.size} lead${selectedRows.size > 1 ? 's' : ''} selected — pick an employee and click Assign`
+                        : 'Select leads from the table below, then choose an employee to assign them'}
+                    </div>
+                  </div>
                 </div>
-                <select
-                  value={assignEmployee}
-                  onChange={e => setAssignEmployee(e.target.value)}
-                  style={{ flex: 1, minWidth: 200, maxWidth: 400, padding: '9px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)', borderRadius: 10, color: 'var(--text)', fontSize: '0.88rem', fontFamily: 'inherit', cursor: 'pointer' }}
-                >
-                  <option value="">— No assignment (use file data) —</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.email})</option>)}
-                </select>
-                {assignEmployee && (
-                  <button onClick={() => setAssignEmployee('')} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
-                    ✕ Clear
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <select
+                    value={assignEmployee}
+                    onChange={e => setAssignEmployee(e.target.value)}
+                    style={{ flex: 1, minWidth: 220, maxWidth: 420, padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 10, color: 'var(--text)', fontSize: '0.88rem', fontFamily: 'inherit', cursor: 'pointer' }}
+                  >
+                    <option value="">— Select Employee —</option>
+                    {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.email})</option>)}
+                  </select>
+                  {assignEmployee && (
+                    <button onClick={() => setAssignEmployee('')} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
+                      ✕ Clear
+                    </button>
+                  )}
+                  <button
+                    onClick={assignSelectedLeads}
+                    disabled={importing || !assignEmployee || selectedRows.size === 0}
+                    style={{
+                      padding: '10px 28px', borderRadius: 10, border: 'none', fontWeight: 700, cursor: 'pointer', color: '#fff',
+                      background: (!assignEmployee || selectedRows.size === 0) ? '#9ca3af' : 'linear-gradient(135deg, #10b981, #059669)',
+                      boxShadow: (!assignEmployee || selectedRows.size === 0) ? 'none' : '0 4px 16px rgba(16,185,129,0.35)',
+                      opacity: importing ? 0.6 : 1,
+                      display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem',
+                      transition: 'all 0.25s ease',
+                    }}
+                  >
+                    <UserCheck size={16} />
+                    {importing ? 'Assigning...' : `Assign ${selectedRows.size > 0 ? selectedRows.size : 0} Lead${selectedRows.size !== 1 ? 's' : ''}`}
                   </button>
+                </div>
+                {assignEmployee && selectedRows.size > 0 && (
+                  <div style={{ marginTop: 12, padding: '8px 14px', borderRadius: 8, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)', fontSize: '0.82rem', color: '#059669', fontWeight: 500 }}>
+                    ✅ Ready: {selectedRows.size} lead{selectedRows.size > 1 ? 's' : ''} will be assigned to <strong>{employees.find(e => e.id === assignEmployee)?.name}</strong> and removed from this list
+                  </div>
                 )}
               </div>
 
+              {/* ── Data Table ── */}
               <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 24 }}>
-                <div style={{ overflowX: 'auto', maxHeight: 500 }}>
+                <div style={{ overflowX: 'auto', maxHeight: 520 }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-secondary)', position: 'sticky', top: 0, zIndex: 1 }}>
-                        <th style={{ padding: '10px 8px', borderBottom: '2px solid var(--surface-border)', textAlign: 'center', width: 40 }}>
+                        <th style={{ padding: '10px 8px', borderBottom: '2px solid var(--surface-border)', textAlign: 'center', width: 44 }}>
                           <input
                             type="checkbox"
                             checked={selectedRows.size === bulkRows.length && bulkRows.length > 0}
                             onChange={toggleAllRows}
-                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--primary)' }}
                             title="Select All"
                           />
                         </th>
-                        <th style={{ padding: '10px 12px', borderBottom: '2px solid var(--surface-border)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', textAlign: 'center', whiteSpace: 'nowrap', color: 'var(--text-muted)', width: 44 }}>Row</th>
+                        <th style={{ padding: '10px 12px', borderBottom: '2px solid var(--surface-border)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', textAlign: 'center', whiteSpace: 'nowrap', color: 'var(--text-muted)', width: 44 }}>#</th>
                         {bulkHeaders.map((h, i) => (
                           <th key={i} style={{ padding: '10px 12px', borderBottom: '2px solid var(--surface-border)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', textAlign: 'left', whiteSpace: 'nowrap', color: 'var(--text)' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {bulkRows.slice(0, 50).map((row, ri) => (
-                        <tr key={ri} style={{
-                          borderBottom: '1px solid var(--surface-border)',
-                          background: selectedRows.has(ri) ? 'rgba(99,102,241,0.06)' : (ri % 2 === 0 ? 'var(--surface)' : 'var(--bg-secondary)'),
-                          transition: 'background 0.15s',
-                        }}>
-                          <td style={{ padding: '8px 8px', textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={selectedRows.has(ri)}
-                              onChange={() => toggleRow(ri)}
-                              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
-                            />
-                          </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>{ri + 1}</td>
-                          {row.map((cell, ci) => (
-                            <td key={ci} style={{ padding: '8px 12px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>
-                              {cell || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>}
+                      {pagedRows.map((row, pi) => {
+                        const ri = (previewPage - 1) * ROWS_PER_PAGE + pi;
+                        return (
+                          <tr key={ri} onClick={() => toggleRow(ri)} style={{
+                            borderBottom: '1px solid var(--surface-border)',
+                            background: selectedRows.has(ri) ? 'rgba(16,185,129,0.08)' : (pi % 2 === 0 ? 'var(--surface)' : 'var(--bg-secondary)'),
+                            transition: 'background 0.2s',
+                            cursor: 'pointer',
+                          }}>
+                            <td style={{ padding: '8px 8px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedRows.has(ri)}
+                                onChange={() => toggleRow(ri)}
+                              />
                             </td>
-                          ))}
-                        </tr>
-                      ))}
+                            <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.78rem' }}>{ri + 1}</td>
+                            {row.map((cell, ci) => (
+                              <td key={ci} style={{ padding: '8px 12px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>
+                                {cell || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
-                {bulkRows.length > 50 && (
-                  <div style={{ padding: '10px 16px', background: 'var(--bg-secondary)', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, borderTop: '1px solid var(--surface-border)' }}>
-                    Showing first 50 of {bulkRows.length} rows
+
+                {/* ── Pagination bar ── */}
+                {totalPages > 1 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px',
+                    borderTop: '1px solid var(--surface-border)', background: 'var(--bg-secondary)',
+                    flexWrap: 'wrap', gap: 8,
+                  }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                      Showing {(previewPage - 1) * ROWS_PER_PAGE + 1}–{Math.min(previewPage * ROWS_PER_PAGE, bulkRows.length)} of {bulkRows.length} leads
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button
+                        onClick={() => setPreviewPage(p => Math.max(1, p - 1))}
+                        disabled={previewPage === 1}
+                        style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)', cursor: previewPage === 1 ? 'default' : 'pointer', opacity: previewPage === 1 ? 0.4 : 1, fontWeight: 600, fontSize: '0.8rem' }}
+                      >‹ Prev</button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - previewPage) <= 2)
+                        .reduce((acc, p, idx, arr) => {
+                          if (idx > 0 && p - arr[idx - 1] > 1) acc.push('dots' + idx);
+                          acc.push(p);
+                          return acc;
+                        }, [])
+                        .map((p, i) =>
+                          typeof p === 'string'
+                            ? <span key={p} style={{ padding: '0 4px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>…</span>
+                            : <button
+                                key={p}
+                                onClick={() => setPreviewPage(p)}
+                                style={{
+                                  padding: '5px 10px', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer',
+                                  background: previewPage === p ? 'var(--primary)' : 'transparent',
+                                  color: previewPage === p ? '#fff' : 'var(--text-muted)',
+                                  minWidth: 32,
+                                }}
+                              >{p}</button>
+                        )
+                      }
+                      <button
+                        onClick={() => setPreviewPage(p => Math.min(totalPages, p + 1))}
+                        disabled={previewPage === totalPages}
+                        style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)', cursor: previewPage === totalPages ? 'default' : 'pointer', opacity: previewPage === totalPages ? 0.4 : 1, fontWeight: 600, fontSize: '0.8rem' }}
+                      >Next ›</button>
+                    </div>
                   </div>
                 )}
               </div>
