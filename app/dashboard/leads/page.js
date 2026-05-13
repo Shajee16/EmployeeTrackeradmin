@@ -537,18 +537,57 @@ export default function LeadManagement() {
 
                 {/* Notes */}
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Notes</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notes</div>
+                    {editForm.notes !== (detailModal.notes || '') && (
+                      <button onClick={async () => {
+                        const res = await fetch('/api/admin-leads', {
+                          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: detailModal.id, notes: editForm.notes }),
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setDetailModal(prev => ({ ...prev, notes: editForm.notes, activities: data.lead?.activities || prev.activities }));
+                          setSaveFlash('✓ Notes saved');
+                          setTimeout(() => setSaveFlash(''), 2000);
+                          loadData();
+                        }
+                      }} style={{ padding: '4px 14px', borderRadius: 8, border: 'none', fontWeight: 700, cursor: 'pointer', color: '#fff', fontSize: '0.72rem', background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Save size={12} /> Save Notes
+                      </button>
+                    )}
+                  </div>
                   <textarea value={editForm.notes || ''} onChange={e => editField('notes', e.target.value)} rows={2} placeholder="Add notes about this lead..."
                     style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.82rem', resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5 }} />
                 </div>
 
                 {/* Admin Comment for Employee */}
                 <div style={{ marginBottom: 20, padding: '14px 16px', borderRadius: 12, border: '1.5px dashed rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.04)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                    <MessageCircle size={14} color="#6366f1" />
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6366f1' }}>Admin Comment for Employee</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <MessageCircle size={14} color="#6366f1" />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6366f1' }}>Admin Comment for Employee</span>
+                    </div>
+                    {adminComment.trim() && (
+                      <button onClick={async () => {
+                        const res = await fetch('/api/admin-leads', {
+                          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: detailModal.id, adminComment: adminComment.trim() }),
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setDetailModal(prev => ({ ...prev, activities: data.lead?.activities || prev.activities }));
+                          setAdminComment('');
+                          setSaveFlash('✓ Comment sent');
+                          setTimeout(() => setSaveFlash(''), 2000);
+                          loadData();
+                        }
+                      }} style={{ padding: '4px 14px', borderRadius: 8, border: 'none', fontWeight: 700, cursor: 'pointer', color: '#fff', fontSize: '0.72rem', background: 'linear-gradient(135deg, #6366f1, #7c3aed)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Send size={12} /> Send Comment
+                      </button>
+                    )}
                   </div>
-                  <textarea value={adminComment} onChange={e => { setAdminComment(e.target.value); setEditDirty(true); }} rows={2} placeholder="Leave a comment visible to the assigned employee..."
+                  <textarea value={adminComment} onChange={e => setAdminComment(e.target.value)} rows={2} placeholder="Leave a comment visible to the assigned employee..."
                     style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.03)', color: 'var(--text)', fontSize: '0.82rem', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5 }} />
                   <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '6px 0 0', fontStyle: 'italic' }}>This comment will appear in the employee's activity log for this lead.</p>
                 </div>

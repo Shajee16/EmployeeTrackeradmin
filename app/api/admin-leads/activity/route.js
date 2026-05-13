@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readData, writeData } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { sanitizeString } from '@/lib/utils';
+import { sanitizeString } from '@/lib/sanitize';
 
 export async function DELETE(req) {
   const session = await getSession();
