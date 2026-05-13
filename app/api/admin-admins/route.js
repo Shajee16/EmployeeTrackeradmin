@@ -40,12 +40,13 @@ export async function POST(req) {
   }
 
   const hashedPassword = await bcrypt.hash(sanitizeString(body.password, 128), 10);
+  const chosenRole = body.role === 'Super Admin' ? 'Super Admin' : 'System Admin';
   const newAdmin = {
     id: `ADMIN-${uuid().slice(0, 8).toUpperCase()}`,
     name: sanitizeString(body.name, 100),
     email: sanitizeString(body.email, 254).toLowerCase(),
     password: hashedPassword,
-    role: 'System Admin',
+    role: chosenRole,
     department: sanitizeString(body.department || 'Administration', 50),
     phone: sanitizeString(body.phone || '', 20),
     status: 'active',
@@ -92,9 +93,17 @@ export async function DELETE(req) {
   const auth = await requireSuperAdmin();
   if (auth.error) return auth.response;
 
-  const { searchParams } = new URL(req.url);
-  const id = sanitizeString(searchParams.get('id'), 50);
+  let id;
+  try {
+    const url = new URL(req.url, 'http://localhost');
+    id = url.searchParams.get('id');
+  } catch {
+    // Fallback: parse from nextUrl if available
+    id = req.nextUrl?.searchParams?.get('id');
+  }
+
   if (!id) return NextResponse.json({ error: 'Admin ID required' }, { status: 400 });
+  id = sanitizeString(id, 50);
 
   const admins = await readData('admins');
   const filtered = admins.filter(a => a.id !== id);

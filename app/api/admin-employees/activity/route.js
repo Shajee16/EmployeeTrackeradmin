@@ -102,7 +102,7 @@ export async function GET(req) {
   // Sort newest first
   timeline.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
 
-  const totalHoursLogged = attendance.reduce((sum, a) => sum + (Number(a.totalHours) || 0), 0);
+  const totalHoursLogged = Number(attendance.reduce((sum, a) => sum + (Number(a.totalHours) || 0), 0).toFixed(2));
 
   // Summary stats
   const stats = {

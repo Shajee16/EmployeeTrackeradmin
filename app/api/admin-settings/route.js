@@ -18,8 +18,13 @@ export async function PUT(req) {
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   let body;
-  try { body = sanitizeInput(await req.json()); }
-  catch { return NextResponse.json({ error: 'Invalid body' }, { status: 400 }); }
+  let rawPicture = undefined;
+  try {
+    const raw = await req.json();
+    if (raw.type === 'profilePicture' && raw.picture) rawPicture = raw.picture;
+    body = sanitizeInput(raw);
+    if (rawPicture !== undefined) body.picture = rawPicture;
+  } catch { return NextResponse.json({ error: 'Invalid body' }, { status: 400 }); }
 
   const db = await getDb();
   const update = { userId: session.id, updatedAt: new Date().toISOString() };
@@ -29,6 +34,17 @@ export async function PUT(req) {
   if (body.type === 'profile') {
     update.displayName = sanitizeString(body.displayName || '', 100);
     update.phone = sanitizeString(body.phone || '', 20);
+  }
+  if (body.type === 'profilePicture') {
+    if (!body.picture) {
+      update.profilePicture = null;
+    } else {
+      if (!body.picture.startsWith('data:image/')) return NextResponse.json({ error: 'Invalid image format' }, { status: 400 });
+      const base64Part = body.picture.split(',')[1] || '';
+      const sizeInBytes = Math.ceil(base64Part.length * 3 / 4);
+      if (sizeInBytes > 300 * 1024) return NextResponse.json({ error: 'Image exceeds 300KB limit' }, { status: 400 });
+      update.profilePicture = body.picture;
+    }
   }
   if (body.type === 'notifications') {
     update.notifLeadAssigned = body.notifLeadAssigned !== false;

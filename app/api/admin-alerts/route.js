@@ -96,6 +96,56 @@ export async function POST(req) {
   const db = await getDb();
   await db.collection('alerts').insertOne(alert);
 
+  // Send email to targeted employees
+  try {
+    const { sendEmail } = await import('@/lib/graph-mail');
+    const { readData, writeData } = await import('@/lib/db');
+    
+    let query = {};
+    if (alert.targetType === 'employee') query = { id: alert.targetEmployeeId };
+    else if (alert.targetType === 'department') query = { department: alert.targetDepartment };
+    // if 'all', query stays {}
+    
+    const usersCol = db.collection('users');
+    const targetUsers = await usersCol.find(query).toArray();
+    
+    const emailsData = await readData('emails');
+    const subject = `An alert is issued by "${alert.createdBy}" with severity "${alert.severity.toUpperCase()}"`;
+    const emailBody = `An alert has been issued that requires your attention.\n\nTitle: ${alert.title}\n\nMessage:\n${alert.message}\n\nPlease log in to the Employee Portal to acknowledge this alert immediately.`;
+
+    for (const u of targetUsers) {
+      if (!u.email) continue;
+      try {
+        await sendEmail({
+          to: u.email,
+          toName: u.name || 'Employee',
+          subject,
+          body: emailBody,
+        });
+        
+        emailsData.push({
+          id: uuid(),
+          userId: session.id, // sender is admin
+          senderName: session.name || session.email,
+          to: u.email,
+          toName: u.name,
+          subject,
+          body: emailBody,
+          template: 'alert',
+          status: 'Delivered',
+          sentAt: new Date().toISOString(),
+          sentFrom: process.env.AZURE_SENDER_EMAIL || 'indiaops@cluso.in',
+        });
+      } catch (err) {
+        console.error('Failed to send alert email to', u.email, err);
+      }
+    }
+    
+    await writeData('emails', emailsData);
+  } catch (err) {
+    console.error('Error in alert email broadcast:', err);
+  }
+
   return NextResponse.json({ alert, success: true });
 }
 

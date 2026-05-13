@@ -1,6 +1,26 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, Plus, Download, RefreshCw, CheckCircle, XCircle, Trash2, UserCheck } from 'lucide-react';
+
+const EXPECTED_COLUMNS = [
+  { field: 'Company Name', key: 'companyName', required: true, example: 'TCS, Infosys' },
+  { field: 'Contact Person', key: 'contactPerson', required: true, example: 'Rahul Sharma' },
+  { field: 'Designation', key: 'designation', required: false, example: 'HR Manager' },
+  { field: 'Phone', key: 'phone', required: true, example: '+91 98765 43210' },
+  { field: 'Email', key: 'email', required: false, example: 'rahul@tcs.com' },
+  { field: 'Address', key: 'address', required: false, example: 'Mumbai, India' },
+  { field: 'Industry', key: 'industry', required: false, example: 'IT/Software' },
+  { field: 'Company Size', key: 'companySize', required: false, example: '201-500' },
+  { field: 'Services Interested', key: 'servicesInterested', required: false, example: 'Web Development, SEO' },
+  { field: 'Source', key: 'source', required: false, example: 'LinkedIn' },
+  { field: 'Est Monthly Volume', key: 'estMonthlyVolume', required: false, example: '100' },
+  { field: 'Est Deal Value', key: 'estDealValue', required: false, example: '50000' },
+  { field: 'Status', key: 'status', required: false, example: 'New' },
+  { field: 'Priority', key: 'priority', required: false, example: 'Medium' },
+  { field: 'Notes', key: 'notes', required: false, example: 'Interested in CRM' },
+  { field: 'Next Follow-up Date', key: 'nextFollowUpDate', required: false, example: '2026-06-01' },
+  { field: 'Assign To Email', key: 'assignToEmail', required: false, example: 'employee@cluso.in' },
+];
 
 export default function BulkLeadsPage() {
   const [employees, setEmployees] = useState([]);
@@ -8,9 +28,18 @@ export default function BulkLeadsPage() {
   const [tab, setTab] = useState('add');
   const [msg, setMsg] = useState({ text: '', type: '' });
   const [importing, setImporting] = useState(false);
-  const [preview, setPreview] = useState([]);
   const [csvErrors, setCsvErrors] = useState([]);
   const fileRef = useRef();
+  // Multi-step bulk upload state
+  const [bulkStep, setBulkStep] = useState('format');
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkHeaders, setBulkHeaders] = useState([]);
+  const [bulkRows, setBulkRows] = useState([]);
+  const [bulkResults, setBulkResults] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [parseError, setParseError] = useState('');
+  const [selectedRows, setSelectedRows] = useState(new Set());
+  const [assignEmployee, setAssignEmployee] = useState('');
 
   // Single lead form
   const [form, setForm] = useState({ companyName: '', contactPerson: '', designation: '', phone: '', email: '', address: '', industry: '', companySize: '', source: 'Admin Assigned', priority: 'Medium', status: 'New', notes: '', assignToEmployeeId: '' });
@@ -44,62 +73,99 @@ export default function BulkLeadsPage() {
     setSubmitting(false);
   };
 
-  const parseCsv = (text) => {
-    const lines = text.trim().split('\n');
-    if (lines.length < 2) return [];
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-    return lines.slice(1).filter(l => l.trim()).map(line => {
-      const vals = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$|^(?=,))/g) || line.split(',');
-      const obj = {};
-      headers.forEach((h, i) => { obj[h] = (vals[i] || '').replace(/"/g, '').trim(); });
-      return obj;
-    });
-  };
-
-  const handleFile = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const parseFile = useCallback((file) => {
+    setParseError('');
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const rows = parseCsv(ev.target.result);
-      setPreview(rows.slice(0, 5));
-      setCsvErrors([]);
+    reader.onload = async (e) => {
+      try {
+        const XLSX = await import('xlsx');
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+        if (json.length < 2) { setParseError('File must have at least a header row and one data row.'); return; }
+        const hdrs = json[0].map(h => String(h).trim());
+        const dataRows = json.slice(1).filter(row => row.some(cell => cell !== '' && cell != null));
+        if (dataRows.length === 0) { setParseError('No data rows found after the header row.'); return; }
+        const normalizedRows = dataRows.map(row => {
+          const r = [];
+          for (let i = 0; i < hdrs.length; i++) {
+            let val = row[i] != null ? row[i] : '';
+            if (val instanceof Date) val = val.toISOString().split('T')[0];
+            r.push(String(val).trim());
+          }
+          return r;
+        });
+        setBulkHeaders(hdrs);
+        setBulkRows(normalizedRows);
+        setBulkFile(file);
+        setBulkStep('preview');
+      } catch (err) {
+        setParseError(`Failed to parse the file. Ensure it is a valid CSV or Excel file. (${err.message})`);
+      }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
+  }, []);
+
+  const handleDrop = (e) => { e.preventDefault(); setDragActive(false); if (e.dataTransfer.files?.[0]) parseFile(e.dataTransfer.files[0]); };
+  const handleFileChange = (e) => { if (e.target.files?.[0]) parseFile(e.target.files[0]); };
+
+  // Build a map of display header -> API key for column name mapping
+  const headerToKey = (header) => {
+    const col = EXPECTED_COLUMNS.find(c => c.field.toLowerCase() === header.toLowerCase());
+    return col ? col.key : header;
   };
 
-  const importLeads = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file) return flash('Please select a file first', 'error');
+  const handleBulkUpload = async () => {
     setImporting(true);
-    const text = await file.text();
-    const rows = parseCsv(text);
-    const res = await fetch('/api/admin-leads/bulk-import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leads: rows }),
-    });
-    const data = await res.json();
-    if (!res.ok) flash(data.error || 'Import failed', 'error');
-    else {
-      flash(`✅ Imported ${data.imported} leads${data.errors?.length ? ` (${data.errors.length} skipped)` : ''}!`);
-      setCsvErrors(data.errors || []);
-      setPreview([]);
-      fileRef.current.value = '';
-      load();
-    }
+    try {
+      // Filter to only selected rows (or all if none selected)
+      const rowsToUpload = selectedRows.size > 0
+        ? bulkRows.filter((_, i) => selectedRows.has(i))
+        : bulkRows;
+
+      // Convert headers+rows into objects with API-compatible keys
+      const leadsArr = rowsToUpload.map(row => {
+        const obj = {};
+        bulkHeaders.forEach((h, i) => { obj[headerToKey(h)] = row[i] || ''; });
+        // If an employee is selected for bulk assignment, override the assignToEmail
+        if (assignEmployee) {
+          const emp = employees.find(e => e.id === assignEmployee);
+          if (emp) obj.assignToEmail = emp.email;
+        }
+        return obj;
+      });
+      const res = await fetch('/api/admin-leads/bulk-import', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads: leadsArr }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setParseError(data.error || 'Import failed'); }
+      else {
+        setBulkResults({ totalProcessed: leadsArr.length, successCount: data.imported || 0, skippedCount: 0, errorCount: data.errors?.length || 0, errors: data.errors || [] });
+        setBulkStep('results');
+        load();
+      }
+    } catch (err) { setParseError('Network error during upload.'); }
     setImporting(false);
   };
 
-  const downloadTemplate = () => {
-    const headers = 'companyName,contactPerson,designation,phone,email,address,industry,companySize,source,priority,status,notes,estDealValue,assignToEmail,servicesInterested';
-    const sample = 'Acme Corp,John Doe,Manager,9876543210,john@acme.com,"Mumbai, MH",Technology,50-200,Cold Call,High,New,Interested in BGV services,500000,employee@company.com,BGV';
-    const blob = new Blob([headers + '\n' + sample], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'cluso_leads_template.csv'; a.click();
-    URL.revokeObjectURL(url);
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx');
+    const ws = XLSX.utils.aoa_to_sheet([
+      EXPECTED_COLUMNS.map(c => c.field),
+      EXPECTED_COLUMNS.map(c => c.example),
+    ]);
+    ws['!cols'] = EXPECTED_COLUMNS.map(() => ({ wch: 22 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+    XLSX.writeFile(wb, 'Cluso_Leads_Template.xlsx');
   };
+
+  const resetBulk = () => { setBulkStep('format'); setBulkFile(null); setBulkHeaders([]); setBulkRows([]); setBulkResults(null); setParseError(''); setCsvErrors([]); setSelectedRows(new Set()); setAssignEmployee(''); };
+
+  const toggleRow = (i) => { setSelectedRows(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; }); };
+  const toggleAllRows = () => { setSelectedRows(prev => prev.size === bulkRows.length ? new Set() : new Set(bulkRows.map((_, i) => i))); };
 
   const card = { background: 'var(--surface)', border: '1px solid var(--surface-border)', borderRadius: 16, padding: 24 };
   const inp = { width: '100%', padding: '9px 13px', background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)', borderRadius: 9, color: 'var(--text)', fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit' };
@@ -208,94 +274,245 @@ export default function BulkLeadsPage() {
         </div>
       )}
 
-      {/* Bulk Import */}
+      {/* Bulk Import — Multi-Step */}
       {tab === 'bulk' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ ...card, border: '2px dashed var(--primary)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}><Upload size={18}/> Upload CSV / Excel</h3>
-              <button onClick={downloadTemplate} style={{ padding: '7px 16px', borderRadius: 9, border: '1px solid var(--primary)', background: 'transparent', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: '0.85rem' }}>
-                <Download size={14}/> Download Template
-              </button>
-            </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 16 }}>
-              Upload a CSV file with lead data. Download the template above to see the required format. Max 1,000 rows per import. To assign leads, use the <strong>assignToEmail</strong> column with the employee's email address.
-            </p>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleFile} style={{ flex: 1, padding: '9px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)', borderRadius: 9, color: 'var(--text)', fontSize: '0.875rem' }} />
-              <button onClick={importLeads} disabled={importing} style={{ padding: '9px 24px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 9, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 7 }}>
-                <Upload size={15}/> {importing ? 'Importing...' : 'Import Leads'}
-              </button>
-            </div>
-          </div>
-
-          {/* Template reference */}
-          <div style={card}>
-            <h4 style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>📄 CSV Column Reference</h4>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg-secondary)' }}>
-                    {['Column', 'Required', 'Description', 'Example'].map(h => (
-                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 700, borderBottom: '1px solid var(--surface-border)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    ['companyName', '✅ Yes', 'Company / client name', 'Acme Corporation'],
-                    ['contactPerson', 'No', 'Primary contact name', 'John Doe'],
-                    ['designation', 'No', 'Contact designation', 'Sales Manager'],
-                    ['phone', 'No', 'Phone number', '9876543210'],
-                    ['email', 'No', 'Contact email', 'john@acme.com'],
-                    ['address', 'No', 'Company address', 'Mumbai, Maharashtra'],
-                    ['industry', 'No', 'Industry type', 'Technology'],
-                    ['companySize', 'No', 'Employee count range', '50-200'],
-                    ['source', 'No', 'Lead source', 'Cold Call'],
-                    ['priority', 'No', 'Low / Medium / High / Hot / Critical', 'High'],
-                    ['status', 'No', 'New / Contacted / Qualified / Proposal / Negotiation / Closed / Lost', 'New'],
-                    ['notes', 'No', 'Internal notes', 'Follow up next week'],
-                    ['estDealValue', 'No', 'Estimated deal value', '500000'],
-                    ['assignToEmail', 'No', 'Employee email to assign', 'employee@cluso.in'],
-                    ['servicesInterested', 'No', 'Comma-separated services', 'BGV,Staffing'],
-                  ].map(([col, req, desc, ex]) => (
-                    <tr key={col} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--primary)', fontFamily: 'monospace' }}>{col}</td>
-                      <td style={{ padding: '8px 12px', color: req.includes('Yes') ? '#16a34a' : 'var(--text-muted)' }}>{req}</td>
-                      <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{desc}</td>
-                      <td style={{ padding: '8px 12px', color: 'var(--text)', fontFamily: 'monospace', fontSize: '0.75rem' }}>{ex}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {preview.length > 0 && (
-            <div style={card}>
-              <h4 style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>🔍 Preview (first {preview.length} rows)</h4>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                  <thead>
-                    <tr>{Object.keys(preview[0]).map(k => <th key={k} style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600, borderBottom: '1px solid var(--surface-border)', whiteSpace: 'nowrap' }}>{k}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {preview.map((row, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                        {Object.values(row).map((v, j) => <td key={j} style={{ padding: '7px 10px', color: 'var(--text)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</td>)}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+          {parseError && (
+            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '14px 18px', color: '#ef4444', marginBottom: 20, fontSize: '0.9rem', fontWeight: 500 }}>
+              ⚠️ {parseError}
             </div>
           )}
 
-          {csvErrors.length > 0 && (
-            <div style={{ ...card, border: '1px solid #fecaca', background: '#fef2f2' }}>
-              <h4 style={{ fontWeight: 700, color: '#ef4444', marginBottom: 12 }}>⚠️ Import Errors ({csvErrors.length} rows skipped)</h4>
-              {csvErrors.map((e, i) => <p key={i} style={{ fontSize: '0.8rem', color: '#ef4444', marginBottom: 4 }}>Row {e.row}: {e.error}</p>)}
-            </div>
+          {/* ═══ STEP 1: FORMAT GUIDE ═══ */}
+          {bulkStep === 'format' && (
+            <>
+              {/* Instructions */}
+              <div style={{ ...card, position: 'relative', overflow: 'hidden', marginBottom: 24 }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg, #6366f1, #ec4899, #f59e0b)' }} />
+                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 6, marginTop: 8 }}>📋 How It Works</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.6, marginBottom: 16 }}>
+                  Prepare your Excel or CSV file using the table format shown below. Your file&apos;s first row <strong>must</strong> be the column headers.
+                  The system intelligently matches column names — you don&apos;t need exact names (e.g., &quot;Company&quot; works just like &quot;Company Name&quot;).
+                </p>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <button onClick={downloadTemplate} style={{ padding: '10px 22px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
+                    ⬇️ Download Template (.xlsx)
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'rgba(99,102,241,0.08)', borderRadius: 10, fontSize: '0.82rem', color: 'var(--primary)', fontWeight: 600 }}>
+                    Accepts: .xlsx, .xls, .csv
+                  </div>
+                </div>
+              </div>
+
+              {/* Format Table */}
+              <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 24 }}>
+                <div style={{ padding: '16px 20px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ fontWeight: 700, fontSize: '0.95rem', margin: 0 }}>📑 Required Table Format</h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}><span style={{ color: '#ef4444' }}>*</span> = Required</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-secondary)' }}>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', borderBottom: '2px solid var(--surface-border)', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Column Name</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'center', borderBottom: '2px solid var(--surface-border)', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Required</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', borderBottom: '2px solid var(--surface-border)', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Example Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {EXPECTED_COLUMNS.map((col, i) => (
+                        <tr key={col.field} style={{ background: i % 2 === 0 ? 'var(--surface)' : 'var(--bg-secondary)', borderBottom: '1px solid var(--surface-border)' }}>
+                          <td style={{ padding: '10px 14px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {col.field} {col.required && <span style={{ color: '#ef4444' }}>*</span>}
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                            {col.required ? (
+                              <span style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', padding: '2px 10px', borderRadius: 50, fontSize: '0.72rem', fontWeight: 700 }}>Required</span>
+                            ) : (
+                              <span style={{ background: 'rgba(107,114,128,0.1)', color: 'var(--text-muted)', padding: '2px 10px', borderRadius: 50, fontSize: '0.72rem', fontWeight: 600 }}>Optional</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 14px', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.8rem' }}>{col.example}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Pro Tips */}
+              <div style={{ ...card, background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.15)', marginBottom: 24 }}>
+                <h4 style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 10, color: 'var(--primary)' }}>💡 Pro Tips</h4>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[
+                    'Use the assignToEmail column to auto-assign leads to employees',
+                    'Status values: New, Contacted, Qualified, Proposal, Negotiation, Closed, Lost',
+                    'Priority values: Low, Medium, High, Hot, Critical',
+                    'Duplicate leads (matching email or phone) will be automatically skipped',
+                    'Column names are flexible — "Company" works the same as "Company Name"',
+                  ].map((tip, i) => (
+                    <li key={i} style={{ fontSize: '0.82rem', color: 'var(--text)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <span style={{ color: '#10b981', fontWeight: 700, flexShrink: 0 }}>✓</span> {tip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Drop Zone */}
+              <div
+                onDragEnter={(e) => { e.preventDefault(); setDragActive(true); }}
+                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={handleDrop}
+                onClick={() => fileRef.current?.click()}
+                style={{
+                  border: `2px dashed ${dragActive ? '#6366f1' : 'var(--surface-border)'}`,
+                  borderRadius: 16, padding: '50px 40px', textAlign: 'center', cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  background: dragActive ? 'rgba(99,102,241,0.06)' : 'var(--surface)', marginBottom: 24,
+                }}
+              >
+                <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleFileChange} style={{ display: 'none' }} />
+                <div style={{ fontSize: '3rem', marginBottom: 16, opacity: 0.7 }}>{dragActive ? '📂' : '📄'}</div>
+                <p style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: 6, color: 'var(--text)' }}>
+                  {dragActive ? 'Drop your file here!' : 'Drag & Drop your file here'}
+                </p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  or <span style={{ color: 'var(--primary)', fontWeight: 600 }}>click to browse</span> — Supports .xlsx, .xls, .csv
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* ═══ STEP 2: PREVIEW ═══ */}
+          {bulkStep === 'preview' && (
+            <>
+              <div style={{ ...card, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <h3 style={{ fontWeight: 700, fontSize: '1.05rem', margin: 0 }}>📋 Preview — {bulkFile?.name}</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: 4 }}>
+                    {bulkRows.length} leads found • {bulkHeaders.length} columns detected
+                    {selectedRows.size > 0 && <span style={{ color: 'var(--primary)', fontWeight: 600 }}> • {selectedRows.size} selected</span>}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={resetBulk} style={{ padding: '8px 18px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>← Change File</button>
+                  <button onClick={handleBulkUpload} disabled={importing} style={{
+                    padding: '9px 24px', borderRadius: 10, border: 'none', fontWeight: 700, cursor: 'pointer', color: '#fff',
+                    background: 'linear-gradient(135deg, #6366f1, #7c3aed)', boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
+                    opacity: importing ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    {importing ? '⏳ Uploading...' : `🚀 Upload ${selectedRows.size > 0 ? selectedRows.size : bulkRows.length} Leads`}
+                  </button>
+                </div>
+              </div>
+
+              {/* Assign to Employee bar */}
+              <div style={{ ...card, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <UserCheck size={18} color="var(--primary)" />
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>Assign {selectedRows.size > 0 ? `${selectedRows.size} selected` : 'all'} leads to:</span>
+                </div>
+                <select
+                  value={assignEmployee}
+                  onChange={e => setAssignEmployee(e.target.value)}
+                  style={{ flex: 1, minWidth: 200, maxWidth: 400, padding: '9px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)', borderRadius: 10, color: 'var(--text)', fontSize: '0.88rem', fontFamily: 'inherit', cursor: 'pointer' }}
+                >
+                  <option value="">— No assignment (use file data) —</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.email})</option>)}
+                </select>
+                {assignEmployee && (
+                  <button onClick={() => setAssignEmployee('')} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
+                    ✕ Clear
+                  </button>
+                )}
+              </div>
+
+              <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 24 }}>
+                <div style={{ overflowX: 'auto', maxHeight: 500 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-secondary)', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <th style={{ padding: '10px 8px', borderBottom: '2px solid var(--surface-border)', textAlign: 'center', width: 40 }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.size === bulkRows.length && bulkRows.length > 0}
+                            onChange={toggleAllRows}
+                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                            title="Select All"
+                          />
+                        </th>
+                        <th style={{ padding: '10px 12px', borderBottom: '2px solid var(--surface-border)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', textAlign: 'center', whiteSpace: 'nowrap', color: 'var(--text-muted)', width: 44 }}>Row</th>
+                        {bulkHeaders.map((h, i) => (
+                          <th key={i} style={{ padding: '10px 12px', borderBottom: '2px solid var(--surface-border)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', textAlign: 'left', whiteSpace: 'nowrap', color: 'var(--text)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkRows.slice(0, 50).map((row, ri) => (
+                        <tr key={ri} style={{
+                          borderBottom: '1px solid var(--surface-border)',
+                          background: selectedRows.has(ri) ? 'rgba(99,102,241,0.06)' : (ri % 2 === 0 ? 'var(--surface)' : 'var(--bg-secondary)'),
+                          transition: 'background 0.15s',
+                        }}>
+                          <td style={{ padding: '8px 8px', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedRows.has(ri)}
+                              onChange={() => toggleRow(ri)}
+                              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                            />
+                          </td>
+                          <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>{ri + 1}</td>
+                          {row.map((cell, ci) => (
+                            <td key={ci} style={{ padding: '8px 12px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>
+                              {cell || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {bulkRows.length > 50 && (
+                  <div style={{ padding: '10px 16px', background: 'var(--bg-secondary)', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, borderTop: '1px solid var(--surface-border)' }}>
+                    Showing first 50 of {bulkRows.length} rows
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ═══ STEP 3: RESULTS ═══ */}
+          {bulkStep === 'results' && bulkResults && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 16, marginBottom: 24 }}>
+                <div style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', padding: '22px 18px', borderRadius: 16, color: '#fff', textAlign: 'center' }}>
+                  <div style={{ fontSize: '2.2rem', fontWeight: 800, lineHeight: 1 }}>{bulkResults.totalProcessed}</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: 10, opacity: 0.9 }}>Total Processed</div>
+                </div>
+                <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', padding: '22px 18px', borderRadius: 16, color: '#fff', textAlign: 'center' }}>
+                  <div style={{ fontSize: '2.2rem', fontWeight: 800, lineHeight: 1 }}>{bulkResults.successCount}</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: 10, opacity: 0.9 }}>Imported</div>
+                </div>
+                <div style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', padding: '22px 18px', borderRadius: 16, color: '#fff', textAlign: 'center' }}>
+                  <div style={{ fontSize: '2.2rem', fontWeight: 800, lineHeight: 1 }}>{bulkResults.errorCount}</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: 10, opacity: 0.9 }}>Errors</div>
+                </div>
+              </div>
+
+              {bulkResults.errors?.length > 0 && (
+                <div style={{ ...card, border: '1px solid #fecaca', background: '#fef2f2', marginBottom: 24 }}>
+                  <h4 style={{ fontWeight: 700, color: '#ef4444', marginBottom: 12 }}>⚠️ Import Errors ({bulkResults.errors.length} rows skipped)</h4>
+                  {bulkResults.errors.map((e, i) => <p key={i} style={{ fontSize: '0.8rem', color: '#ef4444', marginBottom: 4 }}>Row {e.row}: {e.error}</p>)}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button onClick={resetBulk} style={{ padding: '10px 22px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>📊 Upload More</button>
+                <button onClick={() => setTab('add')} style={{ padding: '10px 22px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #6366f1, #7c3aed)', color: '#fff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,0.35)' }}>← Back to Add Leads</button>
+              </div>
+            </>
           )}
         </div>
       )}

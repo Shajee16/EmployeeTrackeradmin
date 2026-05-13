@@ -13,7 +13,7 @@ export default function EmployeesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editModal, setEditModal] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', department: 'Sales', role: 'Employee', designation: '', phone: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', department: 'Sales', role: 'Employee', designation: '', phone: '', dob: '' });
   const [editForm, setEditForm] = useState({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -51,7 +51,7 @@ export default function EmployeesPage() {
     const res = await fetch('/api/admin-employees', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     const data = await res.json();
     if (!res.ok) return showMsg(data.error, true);
-    setShowCreate(false); setForm({ name: '', email: '', password: '', department: 'Sales', role: 'Employee', designation: '', phone: '' });
+    setShowCreate(false); setForm({ name: '', email: '', password: '', department: 'Sales', role: 'Employee', designation: '', phone: '', dob: '' });
     showMsg('Employee created'); load();
   };
 
@@ -128,14 +128,17 @@ export default function EmployeesPage() {
   }, [activityData, activityDateFilter]);
 
   const displayHours = useMemo(() => {
-    if (!activityData) return 0;
-    if (!activityDateFilter) return activityData.stats.totalHoursLogged || 0;
-    
-    if (activityData.attendance) {
+    if (!activityData) return '0h';
+    let hours = 0;
+    if (!activityDateFilter) {
+      hours = activityData.stats.totalHoursLogged || 0;
+    } else if (activityData.attendance) {
       const dayRecords = activityData.attendance.filter(a => a.date === activityDateFilter);
-      return Number(dayRecords.reduce((sum, a) => sum + (Number(a.totalHours) || 0), 0).toFixed(1));
+      hours = dayRecords.reduce((sum, a) => sum + (Number(a.totalHours) || 0), 0);
     }
-    return 0;
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
   }, [activityData, activityDateFilter]);
 
   const displayActivitiesCount = useMemo(() => {
@@ -249,7 +252,7 @@ export default function EmployeesPage() {
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16, marginBottom: 32 }}>
                     {[
-                      { label: 'Logged Hours', val: displayHours + 'h', gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' },
+                      { label: 'Logged Hours', val: displayHours, gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' },
                       { label: 'Total Activities', val: displayActivitiesCount, gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' },
                       { label: 'Tasks Given', val: activityData.stats.totalTasks || 0, gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)' },
                       { label: 'Tasks Completed', val: activityData.stats.completedTasks || 0, gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
@@ -460,6 +463,10 @@ export default function EmployeesPage() {
                     <input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="+91 98765 43210" style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
                   </div>
                 </div>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Date of Birth</label>
+                  <input type="date" value={form.dob} onChange={e => setForm({...form, dob: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
+                </div>
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                   <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>Cancel</button>
                   <button type="submit" className="btn btn-primary"><Check size={16} /> Create Employee</button>
@@ -518,6 +525,10 @@ export default function EmployeesPage() {
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Phone</label>
                     <input value={editForm.phone || ''} onChange={e => setEditForm({...editForm, phone: e.target.value})} placeholder="+91 98765 43210" style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
                   </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Date of Birth</label>
+                  <input type="date" value={editForm.dob || ''} onChange={e => setEditForm({...editForm, dob: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }} />
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Status</label>

@@ -125,6 +125,7 @@ export async function POST(req) {
     department: sanitizeString(body.department || 'Sales', 50),
     designation: sanitizeString(body.designation || '', 100),
     phone: sanitizeString(body.phone || '', 20),
+    dob: sanitizeString(body.dob || '', 20),
     status: 'active',
     theme: 'system',
     joinedAt: new Date().toISOString(),
@@ -174,6 +175,7 @@ export async function PUT(req) {
   if (body.role !== undefined) users[idx].role = sanitizeString(body.role, 50);
   if (body.designation !== undefined) users[idx].designation = sanitizeString(body.designation, 100);
   if (body.phone !== undefined) users[idx].phone = sanitizeString(body.phone, 20);
+  if (body.dob !== undefined) users[idx].dob = sanitizeString(body.dob, 20);
   if (body.newPassword) {
     users[idx].password = await bcrypt.hash(sanitizeString(body.newPassword, 128), 10);
   }

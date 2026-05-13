@@ -9,7 +9,7 @@ export default function AdminManagementPage() {
   const [showForm, setShowForm] = useState(false);
   const [msg, setMsg] = useState({ text: '', type: '' });
   const [showPw, setShowPw] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', department: 'Administration' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', department: 'Administration', role: 'System Admin' });
   const [submitting, setSubmitting] = useState(false);
 
   const flash = (text, type = 'success') => { setMsg({ text, type }); setTimeout(() => setMsg({ text: '', type: '' }), 4000); };
@@ -39,7 +39,7 @@ export default function AdminManagementPage() {
     });
     const data = await res.json();
     if (!res.ok) { flash(data.error || 'Failed to create admin', 'error'); }
-    else { flash('Admin created successfully!'); setForm({ name: '', email: '', password: '', phone: '', department: 'Administration' }); setShowForm(false); load(); }
+    else { flash('Admin created successfully!'); setForm({ name: '', email: '', password: '', phone: '', department: 'Administration', role: 'System Admin' }); setShowForm(false); load(); }
     setSubmitting(false);
   };
 
@@ -54,9 +54,14 @@ export default function AdminManagementPage() {
 
   const deleteAdmin = async (admin) => {
     if (!confirm(`Remove admin ${admin.name}? They will lose all access immediately.`)) return;
-    const res = await fetch(`/api/admin-admins?id=${admin.id}`, { method: 'DELETE' });
-    if (res.ok) { flash('Admin removed'); load(); }
-    else flash('Failed to delete', 'error');
+    try {
+      const res = await fetch(`/api/admin-admins?id=${encodeURIComponent(admin.id)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) { flash('Admin removed'); load(); }
+      else flash(data.error || 'Failed to delete', 'error');
+    } catch (err) {
+      flash('Network error: ' + err.message, 'error');
+    }
   };
 
   const isSuperAdmin = user?.role === 'Super Admin';
@@ -138,6 +143,16 @@ export default function AdminManagementPage() {
                   ))}
                 </select>
               </div>
+              <div>
+                <label style={lbl}>Admin Type *</label>
+                <select style={input} value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
+                  <option value="System Admin">System Admin</option>
+                  <option value="Super Admin">Super Admin</option>
+                </select>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                  {form.role === 'Super Admin' ? '⚡ Can manage all admins and has full system access' : '🔒 Has all permissions except creating/managing other admins'}
+                </p>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button type="submit" disabled={submitting} style={{ padding: '10px 24px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -178,14 +193,14 @@ export default function AdminManagementPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                  {['Name', 'Email', 'Department', 'Phone', 'Created By', 'Status', 'Actions'].map(h => (
+                  {['Name', 'Email', 'Role', 'Department', 'Created By', 'Status', 'Actions'].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '10px 12px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {admins.map(admin => (
-                  <tr key={admin.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                {admins.map((admin, idx) => (
+                  <tr key={admin.id || admin._id || idx} style={{ borderBottom: '1px solid var(--surface-border)' }}>
                     <td style={{ padding: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary-light), var(--primary))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
@@ -195,8 +210,12 @@ export default function AdminManagementPage() {
                       </div>
                     </td>
                     <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{admin.email}</td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, background: admin.role === 'Super Admin' ? '#ede9fe' : '#eff6ff', color: admin.role === 'Super Admin' ? '#7c3aed' : '#3b82f6', border: `1px solid ${admin.role === 'Super Admin' ? '#c4b5fd' : '#bfdbfe'}` }}>
+                        {admin.role === 'Super Admin' ? '⚡ Super Admin' : '🔒 System Admin'}
+                      </span>
+                    </td>
                     <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{admin.department || '—'}</td>
-                    <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{admin.phone || '—'}</td>
                     <td style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>{admin.createdBy || 'Super Admin'}</td>
                     <td style={{ padding: '12px' }}>
                       <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, background: admin.status === 'active' ? '#dcfce7' : '#fef2f2', color: admin.status === 'active' ? '#16a34a' : '#ef4444' }}>
