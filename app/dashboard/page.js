@@ -18,7 +18,7 @@ export default function StrategicCommand() {
 
   useEffect(() => {
     fetchDashboard();
-    pollRef.current = setInterval(fetchDashboard, 15000);
+    pollRef.current = setInterval(fetchDashboard, 45000);
     return () => clearInterval(pollRef.current);
   }, []);
 

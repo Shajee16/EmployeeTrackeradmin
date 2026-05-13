@@ -43,7 +43,7 @@ export default function AttendancePage() {
   };
   useEffect(() => {
     fetchData();
-    const poll = setInterval(fetchData, 15000);
+    const poll = setInterval(fetchData, 45000);
     return () => clearInterval(poll);
   }, []);
 

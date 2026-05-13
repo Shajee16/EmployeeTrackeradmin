@@ -45,11 +45,11 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     load();
-    const poll = setInterval(load, 15000);
+    const poll = setInterval(load, 45000);
     return () => clearInterval(poll);
   }, []);
 
-  // Poll online status every 15 seconds
+  // Poll online status every 45 seconds
   const fetchOnlineStatus = async () => {
     try {
       const res = await fetch('/api/admin-employees/online-status');
@@ -60,7 +60,7 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     fetchOnlineStatus();
-    pollRef.current = setInterval(fetchOnlineStatus, 15000);
+    pollRef.current = setInterval(fetchOnlineStatus, 45000);
     return () => clearInterval(pollRef.current);
   }, []);
 

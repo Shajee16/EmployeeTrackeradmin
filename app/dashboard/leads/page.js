@@ -51,7 +51,7 @@ export default function LeadManagement() {
 
   useEffect(() => {
     loadData();
-    const poll = setInterval(loadData, 15000);
+    const poll = setInterval(loadData, 45000);
     return () => clearInterval(poll);
   }, []);
 
