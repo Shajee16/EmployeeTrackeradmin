@@ -52,12 +52,13 @@ export default function AdminManagementPage() {
     if (res.ok) { flash('Status updated'); load(); }
   };
 
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
   const deleteAdmin = async (admin) => {
-    if (!confirm(`Remove admin ${admin.name}? They will lose all access immediately.`)) return;
     try {
       const res = await fetch(`/api/admin-admins?id=${encodeURIComponent(admin.id)}`, { method: 'DELETE' });
       const data = await res.json();
-      if (res.ok) { flash('Admin removed'); load(); }
+      if (res.ok) { flash('Admin removed'); setConfirmDelete(null); load(); }
       else flash(data.error || 'Failed to delete', 'error');
     } catch (err) {
       flash('Network error: ' + err.message, 'error');
@@ -228,7 +229,7 @@ export default function AdminManagementPage() {
                           style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--bg-secondary)', color: 'var(--text)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
                           {admin.status === 'active' ? 'Deactivate' : 'Activate'}
                         </button>
-                        <button onClick={() => deleteAdmin(admin)} title="Delete Admin"
+                        <button onClick={() => setConfirmDelete(admin)} title="Delete Admin"
                           style={{ padding: '5px 10px', borderRadius: 8, border: 'none', background: '#fef2f2', color: '#ef4444', cursor: 'pointer' }}>
                           <Trash2 size={14} />
                         </button>
@@ -241,6 +242,32 @@ export default function AdminManagementPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {confirmDelete && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setConfirmDelete(null)}>
+          <div style={{ background: 'var(--surface)', borderRadius: 16, padding: 28, maxWidth: 420, width: '90%', boxShadow: '0 20px 50px rgba(0,0,0,0.3)', border: '1px solid var(--surface-border)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Trash2 size={20} color="#ef4444" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem' }}>Delete Admin</h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>This action cannot be undone</p>
+              </div>
+            </div>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text)', lineHeight: 1.6, marginBottom: 20 }}>
+              Are you sure you want to remove <strong>{confirmDelete.name}</strong> ({confirmDelete.email})? They will lose all admin access immediately.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmDelete(null)} style={{ padding: '8px 20px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--bg-secondary)', color: 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+              <button onClick={() => deleteAdmin(confirmDelete)} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Trash2 size={14} /> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -216,13 +216,15 @@ export default function LeadManagement() {
     } else alert('Failed to reassign leads');
   };
 
-  // Delete an activity log
+  // Delete an activity log (called after confirmation)
+  const [confirmDeleteLog, setConfirmDeleteLog] = useState(null); // { leadId, activity }
+
   const deleteActivityLog = async (leadId, activity) => {
-    if (!confirm('Are you sure you want to delete this activity log?')) return;
     const url = `/api/admin-leads/activity?leadId=${leadId}&activityId=${activity.id}&timestamp=${encodeURIComponent(activity.timestamp)}`;
     const res = await fetch(url, { method: 'DELETE' });
     if (res.ok) {
       loadData();
+      setConfirmDeleteLog(null);
       if (detailModal && detailModal.id === leadId) {
         setDetailModal(prev => ({ 
           ...prev, 
@@ -604,7 +606,7 @@ export default function LeadManagement() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(a.timestamp).toLocaleString()}</span>
                             <button 
-                              onClick={() => deleteActivityLog(detailModal.id, a)}
+                              onClick={() => setConfirmDeleteLog({ leadId: detailModal.id, activity: a })}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex' }}
                               title="Delete log"
                             >
@@ -794,6 +796,30 @@ export default function LeadManagement() {
               </div>
             </div>
           </motion.div>
+        </div>
+      )}
+
+      {/* Activity Log Delete Confirmation Modal */}
+      {confirmDeleteLog && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }} onClick={() => setConfirmDeleteLog(null)}>
+          <div style={{ background: 'var(--surface)', borderRadius: 16, padding: 24, maxWidth: 400, width: '90%', boxShadow: '0 20px 50px rgba(0,0,0,0.3)', border: '1px solid var(--surface-border)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Trash2 size={18} color="#ef4444" />
+              </div>
+              <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1rem' }}>Delete Activity Log?</h3>
+            </div>
+            <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 10, marginBottom: 16, borderLeft: '3px solid #ef4444' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 2 }}>{confirmDeleteLog.activity.type}</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{confirmDeleteLog.activity.description?.substring(0, 100)}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmDeleteLog(null)} style={{ padding: '8px 18px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--bg-secondary)', color: 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+              <button onClick={() => deleteActivityLog(confirmDeleteLog.leadId, confirmDeleteLog.activity)} style={{ padding: '8px 18px', borderRadius: 10, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Trash2 size={14} /> Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </motion.div>
