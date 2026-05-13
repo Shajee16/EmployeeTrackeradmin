@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readData, writeData } from '@/lib/db';
+import { readData, writeData, getDb } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { sanitizeInput, sanitizeString, isValidEmail, isNonEmptyString } from '@/lib/sanitize';
 import { auditLog } from '@/lib/audit';
@@ -17,8 +17,12 @@ export async function GET() {
   const auth = await requireSuperAdmin();
   if (auth.error) return auth.response;
 
-  const admins = await readData('admins');
-  const safe = admins.map(({ password, ...a }) => a);
+  const db = await getDb();
+  const rawAdmins = await db.collection('admins').find({}).toArray();
+  const safe = rawAdmins.map(({ password, _id, ...a }) => ({
+    ...a,
+    id: a.id || _id.toString(),
+  }));
   return NextResponse.json({ admins: safe });
 }
 
@@ -98,18 +102,30 @@ export async function DELETE(req) {
     const url = new URL(req.url, 'http://localhost');
     id = url.searchParams.get('id');
   } catch {
-    // Fallback: parse from nextUrl if available
     id = req.nextUrl?.searchParams?.get('id');
   }
 
   if (!id) return NextResponse.json({ error: 'Admin ID required' }, { status: 400 });
   id = sanitizeString(id, 50);
 
-  const admins = await readData('admins');
-  const filtered = admins.filter(a => a.id !== id);
-  if (filtered.length === admins.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const db = await getDb();
+  const col = db.collection('admins');
 
-  await writeData('admins', filtered);
+  // Try matching by custom id first, then by MongoDB _id
+  let result = await col.deleteOne({ id: id });
+  if (result.deletedCount === 0) {
+    try {
+      const { ObjectId } = await import('mongodb');
+      result = await col.deleteOne({ _id: new ObjectId(id) });
+    } catch {
+      // id is not a valid ObjectId, that's fine
+    }
+  }
+
+  if (result.deletedCount === 0) {
+    return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
+  }
+
   await auditLog({ action: 'DELETE_ADMIN', performedBy: auth.session.email, performedByRole: 'Super Admin', details: { adminId: id } });
   return NextResponse.json({ success: true });
 }
