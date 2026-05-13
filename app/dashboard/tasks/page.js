@@ -101,8 +101,15 @@ export default function TaskManagement() {
 
   const deleteTask = async (id) => {
     if (!confirm('Delete this task?')) return;
-    await fetch(`/api/admin-tasks?id=${id}`, { method: 'DELETE' });
-    load();
+    try {
+      const res = await fetch(`/api/admin-tasks?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete task');
+      load();
+    } catch (err) {
+      console.error(err);
+      alert('Error deleting task: ' + err.message);
+    }
   };
 
   const downloadAttachment = async (taskId, filename) => {

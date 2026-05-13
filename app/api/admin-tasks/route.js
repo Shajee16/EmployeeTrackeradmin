@@ -103,8 +103,8 @@ export async function POST(req) {
     newTask.attachmentName = attachmentData.filename;
   }
 
-  tasks.push(newTask);
-  await writeData('tasks', tasks);
+  const db = await getDb();
+  await db.collection('tasks').insertOne(newTask);
 
   await logAdminAction(session, 'CREATE_TASK', 'task', newTask.id, {
     title: newTask.title,
@@ -182,37 +182,48 @@ export async function PUT(req) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const tasks = await readData('tasks');
-  const idx = tasks.findIndex(t => t.id === body.id);
+  const db = await getDb();
+  const target = await db.collection('tasks').findOne({ id: body.id });
 
-  if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!target) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const before = { status: tasks[idx].status, priority: tasks[idx].priority };
-
+  const before = { status: target.status, priority: target.priority };
+  const updateFields = {};
+  
   if (body.status && isOneOf(body.status, ['Pending', 'In Progress', 'Completed', 'Cancelled'])) {
-    tasks[idx].status = body.status;
+    updateFields.status = body.status;
   }
   if (body.priority && isOneOf(body.priority, ['Low', 'Medium', 'High', 'Critical'])) {
-    tasks[idx].priority = body.priority;
+    updateFields.priority = body.priority;
   }
+  
+  const updateDoc = {};
+  if (Object.keys(updateFields).length > 0) {
+    updateDoc.$set = updateFields;
+  }
+  
   if (body.adminComment) {
-    if (!tasks[idx].comments) tasks[idx].comments = [];
-    tasks[idx].comments.push({
+    const newComment = {
       id: uuid(),
       text: sanitizeString(body.adminComment, 1000),
       timestamp: new Date().toISOString(),
       by: 'admin'
-    });
+    };
+    updateDoc.$push = { comments: newComment };
   }
 
-  await writeData('tasks', tasks);
+  if (Object.keys(updateDoc).length > 0) {
+    await db.collection('tasks').updateOne({ id: body.id }, updateDoc);
+  }
+
+  const updatedTask = await db.collection('tasks').findOne({ id: body.id });
 
   await logAdminAction(session, 'UPDATE_TASK', 'task', body.id, {
     before,
-    after: { status: tasks[idx].status, priority: tasks[idx].priority },
+    after: { status: updatedTask.status, priority: updatedTask.priority },
   });
 
-  return NextResponse.json({ task: tasks[idx] });
+  return NextResponse.json({ task: updatedTask });
 }
 
 export async function DELETE(req) {
@@ -227,12 +238,18 @@ export async function DELETE(req) {
     return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
   }
 
-  const tasks = await readData('tasks');
-  const target = tasks.find(t => t.id === id);
-  const filtered = tasks.filter(t => t.id !== id);
-  if (filtered.length === tasks.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const db = await getDb();
+  const target = await db.collection('tasks').findOne({ id });
+  
+  if (!target) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
-  await writeData('tasks', filtered);
+  const result = await db.collection('tasks').deleteOne({ id });
+  
+  if (result.deletedCount === 0) {
+    return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
+  }
 
   // Also remove attachment from MongoDB if any
   try {
