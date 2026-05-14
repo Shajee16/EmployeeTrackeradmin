@@ -25,6 +25,7 @@ export default function EmployeesPage() {
   const [expandedDepts, setExpandedDepts] = useState({});
   const [detailModal, setDetailModal] = useState(null);
   const [activityDateFilter, setActivityDateFilter] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Live online status
   const [onlineMap, setOnlineMap] = useState({});
@@ -96,10 +97,16 @@ export default function EmployeesPage() {
     showMsg(hide ? 'Hidden from leaderboard' : 'Visible on leaderboard'); load();
   };
 
-  const removeEmployee = async (id, name) => {
-    if (!confirm(`Remove "${name}"?`)) return;
-    await fetch(`/api/admin-employees?id=${id}`, { method: 'DELETE' });
-    showMsg(`${name} removed`); load();
+  const confirmDelete = (id, name) => {
+    setDeleteConfirm({ id, name });
+  };
+
+  const executeDelete = async () => {
+    if (!deleteConfirm) return;
+    await fetch(`/api/admin-employees?id=${deleteConfirm.id}`, { method: 'DELETE' });
+    showMsg(`${deleteConfirm.name} removed`); 
+    setDeleteConfirm(null);
+    load();
   };
 
   const handleAddDept = async (e) => {
@@ -309,7 +316,7 @@ export default function EmployeesPage() {
                                 <button className="btn btn-outline" style={{ padding: '6px 12px', color: e.hideFromLeaderboard ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => toggleLeaderboard(e.id, !e.hideFromLeaderboard)} title={e.hideFromLeaderboard ? "Show on Leaderboard" : "Hide from Leaderboard"}>
                                   {e.hideFromLeaderboard ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
-                                <button className="btn btn-danger" style={{ padding: '6px 12px' }} onClick={() => removeEmployee(e.id, e.name)}>
+                                <button className="btn btn-danger" style={{ padding: '6px 12px' }} onClick={() => confirmDelete(e.id, e.name)}>
                                   <UserX size={16} />
                                 </button>
                               </div>
@@ -667,6 +674,27 @@ export default function EmployeesPage() {
                     </div>
                   ))}
                   {savedDepartments.length === 0 && <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>No departments yet</p>}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* DELETE CONFIRM MODAL */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }} onClick={() => setDeleteConfirm(null)}>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="card" style={{ width: 400, background: 'var(--bg)', padding: 0 }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontWeight: 700, fontSize: '1.2rem', margin: 0, color: 'var(--danger)' }}>Confirm Deletion</h3>
+                <button onClick={() => setDeleteConfirm(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
+              </div>
+              <div style={{ padding: 24 }}>
+                <p style={{ margin: '0 0 24px 0', fontSize: '1rem', color: 'var(--text)' }}>Are you sure you want to completely remove <strong>{deleteConfirm.name}</strong>? This action cannot be undone.</p>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+                  <button type="button" className="btn btn-danger" onClick={executeDelete}>Yes, Remove Employee</button>
                 </div>
               </div>
             </motion.div>
