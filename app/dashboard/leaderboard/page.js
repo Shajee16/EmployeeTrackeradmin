@@ -1,14 +1,45 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Trophy, Medal, TrendingUp, TrendingDown, Minus, Phone, Handshake, RotateCcw } from 'lucide-react';
+import { Trophy, Medal, TrendingUp, TrendingDown, Minus, Phone, Handshake, RotateCcw, AlertTriangle } from 'lucide-react';
 
 export default function LeaderboardPage() {
   const [data, setData] = useState([]);
   const [period, setPeriod] = useState('month');
+  const [showDeductModal, setShowDeductModal] = useState(null);
+  const [deductForm, setDeductForm] = useState({ points: '', comment: '' });
+  const [isDeducting, setIsDeducting] = useState(false);
+
+  const fetchLeaderboard = () => {
+    fetch('/api/leaderboard').then(r => r.json()).then(d => setData(d.leaderboard || []));
+  };
 
   useEffect(() => {
-    fetch('/api/leaderboard').then(r => r.json()).then(d => setData(d.leaderboard || []));
+    fetchLeaderboard();
   }, []);
+
+  const handleDeduct = async (e) => {
+    e.preventDefault();
+    if (!deductForm.points || isNaN(deductForm.points)) return alert('Enter valid points');
+    setIsDeducting(true);
+    try {
+      const res = await fetch('/api/leaderboard/deduct', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: showDeductModal.userId, points: deductForm.points, comment: deductForm.comment })
+      });
+      if (res.ok) {
+        setShowDeductModal(null);
+        setDeductForm({ points: '', comment: '' });
+        fetchLeaderboard(); // refresh
+      } else {
+        const d = await res.json();
+        alert('Error: ' + d.error);
+      }
+    } catch (err) {
+      alert('Error deducting points');
+    } finally {
+      setIsDeducting(false);
+    }
+  };
 
   const sorted = [...data].sort((a, b) => b.score - a.score);
   const myRank = -1; // Admin doesn't have a rank
@@ -77,6 +108,7 @@ export default function LeaderboardPage() {
               <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Follow-ups</th>
               <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Score</th>
               <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Trend</th>
+              <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -113,11 +145,48 @@ export default function LeaderboardPage() {
                    e.trend === 'down' ? <TrendingDown size={18} color="#f87171" /> : 
                    <Minus size={18} color="var(--text-muted)" />}
                 </td>
+                <td style={{ padding: '16px' }}>
+                  <button onClick={() => setShowDeductModal(e)} className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)', fontSize: '0.75rem', padding: '4px 8px' }}>
+                    Deduct Pts
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {showDeductModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 400 }}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--danger)' }}>
+                <AlertTriangle size={20} /> Deduct Points
+              </h3>
+              <button className="modal-close" onClick={() => setShowDeductModal(null)}>×</button>
+            </div>
+            <p style={{ marginBottom: 16, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              Deduct points from <strong>{showDeductModal.name}</strong>. They will receive a notification.
+            </p>
+            <form onSubmit={handleDeduct}>
+              <div className="form-group">
+                <label className="form-label">Points to Deduct</label>
+                <input type="number" min="1" required value={deductForm.points} onChange={e => setDeductForm({...deductForm, points: e.target.value})} placeholder="e.g. 50" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Reason / Comment</label>
+                <textarea required value={deductForm.comment} onChange={e => setDeductForm({...deductForm, comment: e.target.value})} placeholder="e.g. Invalid entry in daily report" rows={3} />
+              </div>
+              <div className="form-actions">
+                <button type="button" className="btn btn-ghost" onClick={() => setShowDeductModal(null)}>Cancel</button>
+                <button type="submit" className="btn btn-danger" disabled={isDeducting}>
+                  {isDeducting ? 'Deducting...' : 'Confirm Deduction'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
