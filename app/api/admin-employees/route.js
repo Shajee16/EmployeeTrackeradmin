@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { readData, writeData } from '@/lib/db';
-import { getSession, requireRole } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { sanitizeInput, sanitizeString, isValidEmail, isNonEmptyString } from '@/lib/sanitize';
 import { logAdminAction } from '@/lib/audit';
-import { v4 as uuid } from 'uuid';
 import bcrypt from 'bcryptjs';
 
 // Auth + RBAC guard: rejects unauthenticated or non-admin requests
@@ -46,28 +44,8 @@ export async function GET() {
     await usersCol.deleteMany({ _id: { $in: toDelete } });
   }
   
-  // Reassign IDs
-  const deptCounts = {};
-  for (const u of uniqueUsers) {
-    const dept = u.department || 'Other';
-    const abbrev = dept.substring(0, 3).toUpperCase();
-    if (!deptCounts[abbrev]) deptCounts[abbrev] = 0;
-    deptCounts[abbrev]++;
-    
-    const newId = `CL${abbrev}${String(deptCounts[abbrev]).padStart(3, '0')}`;
-    
-    const oldId = u.id;
-    if (oldId !== newId) {
-      await usersCol.updateOne({ _id: u._id }, { $set: { id: newId } });
-      u.id = newId;
-      // Update references
-      await db.collection('leads').updateMany({ userId: oldId }, { $set: { userId: newId } });
-      await db.collection('followups').updateMany({ userId: oldId }, { $set: { userId: newId } });
-      await db.collection('attendance').updateMany({ userId: oldId }, { $set: { userId: newId } });
-      await db.collection('emails').updateMany({ userId: oldId }, { $set: { userId: newId } });
-      await db.collection('timesessions').updateMany({ userId: oldId }, { $set: { userId: newId } });
-    }
-  }
+  // Employee IDs are permanent — assigned once at creation and never reassigned.
+  // No ID renumbering occurs here.
 
   const sanitized = uniqueUsers.map(({ password, _id, ...u }) => u);
   return NextResponse.json({ employees: sanitized });
@@ -84,7 +62,8 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const users = await readData('users');
+  const db = await getDb();
+  const usersCol = db.collection('users');
   
   // Input validation
   if (!isNonEmptyString(body.name)) {
@@ -97,23 +76,47 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
   }
 
-  if (users.find(u => u.email.toLowerCase() === body.email.toLowerCase())) {
+  const existingUser = await usersCol.findOne({ email: body.email.toLowerCase() });
+  if (existingUser) {
     return NextResponse.json({ error: 'Email already exists' }, { status: 400 });
   }
 
   const deptName = sanitizeString(body.department || 'Sales', 50);
   const abbrev = deptName.substring(0, 3).toUpperCase();
-  const deptUsers = users.filter(u => u.department === deptName && u.id && u.id.startsWith(`CL${abbrev}`));
-  
-  let maxNum = 0;
-  for (const u of deptUsers) {
-    const numMatch = u.id.match(/\d+$/);
-    if (numMatch) {
-      const num = parseInt(numMatch[0], 10);
-      if (num > maxNum) maxNum = num;
+  const prefix = `CL${abbrev}`;
+
+  // Use a persistent counter collection to ensure IDs are never reused.
+  // Even if an employee is deleted, the counter only goes up.
+  const countersCol = db.collection('id_counters');
+
+  // First time bootstrap: check if counter exists, if not seed it from current max in users
+  let counterDoc = await countersCol.findOne({ _id: prefix });
+  if (!counterDoc) {
+    // Find current max ID number for this prefix from all existing users
+    const allDeptUsers = await usersCol.find({ id: { $regex: `^${prefix}` } }).toArray();
+    let maxNum = 0;
+    for (const u of allDeptUsers) {
+      const numMatch = u.id.match(/\d+$/);
+      if (numMatch) {
+        const num = parseInt(numMatch[0], 10);
+        if (num > maxNum) maxNum = num;
+      }
     }
+    await countersCol.updateOne(
+      { _id: prefix },
+      { $set: { seq: maxNum } },
+      { upsert: true }
+    );
   }
-  const customId = `CL${abbrev}${String(maxNum + 1).padStart(3, '0')}`;
+
+  // Atomically increment and get the next ID number
+  const result = await countersCol.findOneAndUpdate(
+    { _id: prefix },
+    { $inc: { seq: 1 } },
+    { returnDocument: 'after', upsert: true }
+  );
+  const nextNum = result.seq;
+  const customId = `${prefix}${String(nextNum).padStart(3, '0')}`;
 
   const hashedPassword = await bcrypt.hash(sanitizeString(body.password, 128), 10);
   const newUser = {
@@ -131,8 +134,7 @@ export async function POST(req) {
     joinedAt: new Date().toISOString(),
   };
 
-  users.push(newUser);
-  await writeData('users', users);
+  await usersCol.insertOne(newUser);
 
   // Audit log
   await logAdminAction(auth.session, 'CREATE_EMPLOYEE', 'employee', newUser.id, {
@@ -157,40 +159,49 @@ export async function PUT(req) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const users = await readData('users');
-  const idx = users.findIndex(u => u.id === body.id);
+  const db = await getDb();
+  const usersCol = db.collection('users');
+  const user = await usersCol.findOne({ id: body.id });
   
-  if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const before = { ...users[idx] };
+  const before = { ...user };
   delete before.password;
+  delete before._id;
   
+  const updateFields = {};
+
   if (body.action === 'toggle_status') {
-    users[idx].status = users[idx].status === 'away' ? 'active' : 'away';
+    updateFields.status = user.status === 'away' ? 'active' : 'away';
   } else if (body.action === 'toggle_leaderboard') {
-    users[idx].hideFromLeaderboard = body.hideFromLeaderboard;
+    updateFields.hideFromLeaderboard = body.hideFromLeaderboard;
   }
 
   // Support editing other fields with sanitization
-  if (body.name !== undefined) users[idx].name = sanitizeString(body.name, 100);
-  if (body.department !== undefined) users[idx].department = sanitizeString(body.department, 50);
-  if (body.role !== undefined) users[idx].role = sanitizeString(body.role, 50);
-  if (body.designation !== undefined) users[idx].designation = sanitizeString(body.designation, 100);
-  if (body.phone !== undefined) users[idx].phone = sanitizeString(body.phone, 20);
-  if (body.dob !== undefined) users[idx].dob = sanitizeString(body.dob, 20);
+  // NOTE: Employee ID is NEVER updated — it is permanent and immutable
+  if (body.name !== undefined) updateFields.name = sanitizeString(body.name, 100);
+  if (body.department !== undefined) updateFields.department = sanitizeString(body.department, 50);
+  if (body.role !== undefined) updateFields.role = sanitizeString(body.role, 50);
+  if (body.designation !== undefined) updateFields.designation = sanitizeString(body.designation, 100);
+  if (body.phone !== undefined) updateFields.phone = sanitizeString(body.phone, 20);
+  if (body.dob !== undefined) updateFields.dob = sanitizeString(body.dob, 20);
   if (body.newPassword) {
-    users[idx].password = await bcrypt.hash(sanitizeString(body.newPassword, 128), 10);
+    updateFields.password = await bcrypt.hash(sanitizeString(body.newPassword, 128), 10);
   }
 
-  await writeData('users', users);
+  if (Object.keys(updateFields).length > 0) {
+    await usersCol.updateOne({ id: body.id }, { $set: updateFields });
+  }
 
-  const after = { ...users[idx] };
+  const updatedUser = await usersCol.findOne({ id: body.id });
+  const after = { ...updatedUser };
   delete after.password;
+  delete after._id;
 
   // Audit log
   await logAdminAction(auth.session, 'UPDATE_EMPLOYEE', 'employee', body.id, { before, after });
 
-  const { password, ...sanitized } = users[idx];
+  const { password, _id, ...sanitized } = updatedUser;
   return NextResponse.json({ employee: sanitized, success: true });
 }
 
@@ -205,17 +216,17 @@ export async function DELETE(req) {
     return NextResponse.json({ error: 'Employee ID is required' }, { status: 400 });
   }
 
-  const users = await readData('users');
-  const target = users.find(u => u.id === id);
+  const db = await getDb();
+  const usersCol = db.collection('users');
+  const target = await usersCol.findOne({ id });
   
-  const filtered = users.filter(u => u.id !== id);
-  if (filtered.length === users.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  
-  await writeData('users', filtered);
+  if (!target) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  await usersCol.deleteOne({ id });
 
   // Audit log
   await logAdminAction(auth.session, 'DELETE_EMPLOYEE', 'employee', id, {
-    deletedUser: target ? { name: target.name, email: target.email } : {},
+    deletedUser: { name: target.name, email: target.email },
   });
 
   return NextResponse.json({ success: true });

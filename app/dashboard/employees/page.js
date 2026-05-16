@@ -588,6 +588,13 @@ export default function EmployeesPage() {
                 <button onClick={() => setEditModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
               </div>
               <form onSubmit={handleEdit} style={{ padding: 24 }}>
+                {editForm.id && (
+                  <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Employee ID:</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '1rem', color: 'var(--primary)', letterSpacing: '0.04em' }}>{editForm.id}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 'auto', fontStyle: 'italic' }}>Permanent</span>
+                  </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Full Name</label>
