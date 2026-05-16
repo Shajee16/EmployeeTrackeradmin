@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff } from 'lucide-react';
+import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Target } from 'lucide-react';
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState([]);
@@ -27,6 +27,12 @@ export default function EmployeesPage() {
   const [activityDateFilter, setActivityDateFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
+  // Revenue target states
+  const [targetMap, setTargetMap] = useState({});
+  const [targetModal, setTargetModal] = useState(null); // employee object
+  const [targetAmount, setTargetAmount] = useState('');
+  const [savingTarget, setSavingTarget] = useState(false);
+
   // Live online status
   const [onlineMap, setOnlineMap] = useState({});
   const [onlineFilter, setOnlineFilter] = useState(''); // '' | 'online' | 'offline'
@@ -42,6 +48,7 @@ export default function EmployeesPage() {
       });
       setExpandedDepts(initialExpanded);
     });
+    fetch('/api/admin-employees/targets').then(r => r.json()).then(d => setTargetMap(d.targets || {})).catch(() => {});
   };
 
   useEffect(() => {
@@ -279,6 +286,11 @@ export default function EmployeesPage() {
                                 <div>
                                   <div style={{ fontWeight: 600, fontSize: '1rem' }}>{e.name}</div>
                                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{e.id ? <span style={{fontWeight: 600}}>{e.id}</span> : ''} {e.id ? '•' : ''} {e.email}</div>
+                                  {targetMap[e.id] && (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                      <Target size={10} /> Target: ₹{Number(targetMap[e.id].monthlyTarget).toLocaleString('en-IN')}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -312,6 +324,9 @@ export default function EmployeesPage() {
                                 </button>
                                 <button className="btn btn-outline" style={{ padding: '6px 12px' }} onClick={() => { setEditModal(e); setEditForm({...e, newPassword: ''}); }}>
                                   <Edit size={16} /> Edit
+                                </button>
+                                <button className="btn btn-outline" style={{ padding: '6px 12px', color: targetMap[e.id] ? '#10b981' : 'var(--text-muted)' }} onClick={() => { setTargetModal(e); setTargetAmount(targetMap[e.id]?.monthlyTarget || ''); }} title="Set Revenue Target">
+                                  <Target size={16} />
                                 </button>
                                 <button className="btn btn-outline" style={{ padding: '6px 12px', color: e.hideFromLeaderboard ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => toggleLeaderboard(e.id, !e.hideFromLeaderboard)} title={e.hideFromLeaderboard ? "Show on Leaderboard" : "Hide from Leaderboard"}>
                                   {e.hideFromLeaderboard ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -702,6 +717,110 @@ export default function EmployeesPage() {
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                   <button type="button" className="btn btn-outline" onClick={() => setDeleteConfirm(null)}>Cancel</button>
                   <button type="button" className="btn btn-danger" onClick={executeDelete}>Yes, Remove Employee</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════ SET REVENUE TARGET MODAL ═══════ */}
+      <AnimatePresence>
+        {targetModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }} onClick={() => setTargetModal(null)}>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="card" style={{ width: 460, background: 'var(--bg)', padding: 0 }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Target size={20} color="#10b981" /> Set Revenue Target
+                </h3>
+                <button onClick={() => setTargetModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
+              </div>
+              <div style={{ padding: 24 }}>
+                {/* Employee info */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, padding: 16, background: 'var(--bg-secondary)', borderRadius: 12 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, var(--primary-light, #c29b76), var(--primary, #a67c52))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '1rem', flexShrink: 0 }}>
+                    {targetModal.name?.charAt(0)}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{targetModal.name}</div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{targetModal.id} · {targetModal.department}</div>
+                  </div>
+                </div>
+
+                {/* Current target display */}
+                {targetMap[targetModal.id] && (
+                  <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: 10 }}>
+                    <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Target</span>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 900, color: '#10b981', margin: '4px 0 0' }}>₹{Number(targetMap[targetModal.id].monthlyTarget).toLocaleString('en-IN')}</p>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Set on {new Date(targetMap[targetModal.id].updatedAt).toLocaleDateString()}</span>
+                  </div>
+                )}
+
+                {/* Target input */}
+                <div style={{ marginBottom: 24 }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+                    Monthly Revenue Target (₹)
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-muted)' }}>₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={targetAmount}
+                      onChange={e => setTargetAmount(e.target.value)}
+                      placeholder="e.g. 500000"
+                      style={{
+                        width: '100%', padding: '14px 14px 14px 36px', borderRadius: 10,
+                        border: '2px solid var(--surface-border)', background: 'var(--surface)',
+                        color: 'var(--text)', fontSize: '1.1rem', fontWeight: 700,
+                        fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                        transition: 'border-color 0.2s',
+                      }}
+                      onFocus={e => e.target.style.borderColor = '#10b981'}
+                      onBlur={e => e.target.style.borderColor = 'var(--surface-border)'}
+                      autoFocus
+                    />
+                  </div>
+                  {targetAmount && !isNaN(parseFloat(targetAmount)) && parseFloat(targetAmount) > 0 && (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                      = ₹{Number(parseFloat(targetAmount)).toLocaleString('en-IN')} per month
+                    </p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button onClick={() => setTargetModal(null)} style={{
+                    padding: '10px 22px', borderRadius: 10, border: '1px solid var(--surface-border)',
+                    background: 'var(--bg-secondary)', color: 'var(--text)', cursor: 'pointer', fontWeight: 600,
+                  }}>Cancel</button>
+                  <button disabled={savingTarget || !targetAmount} onClick={async () => {
+                    setSavingTarget(true);
+                    try {
+                      const res = await fetch('/api/admin-employees/targets', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ employeeId: targetModal.id, monthlyTarget: parseFloat(targetAmount) }),
+                      });
+                      if (res.ok) {
+                        showMsg(`Revenue target set for ${targetModal.name}`);
+                        setTargetModal(null);
+                        load();
+                      } else {
+                        const data = await res.json();
+                        showMsg(data.error || 'Failed to save target', true);
+                      }
+                    } catch { showMsg('Network error', true); }
+                    setSavingTarget(false);
+                  }} style={{
+                    padding: '10px 24px', borderRadius: 10, border: 'none',
+                    background: '#10b981', color: '#fff', cursor: 'pointer',
+                    fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8,
+                    opacity: (savingTarget || !targetAmount) ? 0.6 : 1,
+                  }}>
+                    <Target size={16} /> {savingTarget ? 'Saving...' : 'Save Target'}
+                  </button>
                 </div>
               </div>
             </motion.div>
