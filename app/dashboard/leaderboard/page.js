@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Trophy, Medal, TrendingUp, TrendingDown, Minus, Phone, Handshake, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Trophy, Medal, TrendingUp, TrendingDown, Minus, Phone, Handshake, RotateCcw, AlertTriangle, Mail } from 'lucide-react';
 
 export default function LeaderboardPage() {
   const [data, setData] = useState([]);
@@ -68,6 +68,7 @@ export default function LeaderboardPage() {
           { icon: '🏆', label: 'Deal Closed', pts: '1,000 pts', color: '#16a34a', bg: '#f0fdf4' },
           { icon: '📞', label: 'Call Made', pts: '100 pts', color: '#3b82f6', bg: '#eff6ff' },
           { icon: '🔄', label: 'Follow-up', pts: '100 pts', color: '#f59e0b', bg: '#fffbeb' },
+          { icon: '📧', label: 'Contacted', pts: '10 pts', color: '#8b5cf6', bg: '#f3e8ff' },
         ].map(p => (
           <div key={p.label} style={{
             display: 'flex', alignItems: 'center', gap: 8,
@@ -105,6 +106,7 @@ export default function LeaderboardPage() {
               <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Employee</th>
               <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Deals</th>
               <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Calls</th>
+              <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Contacts</th>
               <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Follow-ups</th>
               <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Score</th>
               <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Trend</th>
@@ -138,6 +140,7 @@ export default function LeaderboardPage() {
                 </td>
                 <td style={{ padding: '16px', fontWeight: 600 }}>{e.dealsCount}</td>
                 <td style={{ padding: '16px', fontWeight: 600 }}>{e.callsMade}</td>
+                <td style={{ padding: '16px', fontWeight: 600 }}>{e.emailsSent || 0}</td>
                 <td style={{ padding: '16px', fontWeight: 600 }}>{e.followUps}</td>
                 <td style={{ padding: '16px' }}><strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>{e.score}</strong></td>
                 <td style={{ padding: '16px' }}>

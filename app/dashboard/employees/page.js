@@ -422,7 +422,7 @@ export default function EmployeesPage() {
       {/* Activity Detail Modal */}
       {detailModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110 }} onClick={() => setDetailModal(null)}>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card" style={{ width: 600, maxHeight: '80vh', overflowY: 'auto', background: 'var(--surface)', padding: 24 }} onClick={e => e.stopPropagation()}>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card" style={{ width: 600, maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg)', padding: 24 }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid var(--surface-border)', paddingBottom: 16 }}>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Activity Details</h3>
               <button onClick={() => setDetailModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
