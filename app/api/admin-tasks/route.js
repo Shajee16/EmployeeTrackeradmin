@@ -16,10 +16,11 @@ export async function GET() {
 
   const tasks = await readData('tasks');
   const users = await readData('users');
+  const db = await getDb();
+  const colleges = await db.collection('colleges').find({}).toArray();
 
   // Auto-cleanup: remove attachments older than 25 days from MongoDB
   try {
-    const db = await getDb();
     const cutoff = new Date(Date.now() - 25 * 24 * 60 * 60 * 1000);
     await db.collection('task_attachments').deleteMany({ createdAt: { $lt: cutoff.toISOString() } });
   } catch (err) {
@@ -27,6 +28,13 @@ export async function GET() {
   }
 
   const enhanced = tasks.map(t => {
+    if (t.userId === 'Student Ambassador' || t.scope === 'department') {
+      return { ...t, employeeName: 'All Campus Ambassadors', employeeDept: 'Student Ambassador' };
+    }
+    const college = colleges.find(c => c.id === t.userId || c.id === t.collegeId);
+    if (college) {
+      return { ...t, employeeName: `${college.name} Chapter`, employeeDept: 'Student Ambassador' };
+    }
     const u = users.find(user => user.id === t.userId);
     return { ...t, employeeName: u ? u.name : 'Unknown', employeeDept: u ? u.department : 'Unknown' };
   });
@@ -53,24 +61,23 @@ export async function POST(req) {
   const body = sanitizeInput(rawBody);
 
   if (!isNonEmptyString(body.userId)) {
-    return NextResponse.json({ error: 'Employee (userId) is required' }, { status: 400 });
+    return NextResponse.json({ error: 'Employee or target scope (userId) is required' }, { status: 400 });
   }
   if (!isNonEmptyString(body.title)) {
     return NextResponse.json({ error: 'Task title is required' }, { status: 400 });
   }
 
-  const tasks = await readData('tasks');
-  const users = await readData('users');
-  const assignedUser = users.find(u => u.id === body.userId);
-
   const taskId = uuid();
   const newTask = {
     id: taskId,
-    userId: sanitizeString(body.userId, 50),
+    userId: sanitizeString(body.userId, 50), // Can be employee ID, 'Student Ambassador', or collegeId
+    scope: body.scope || 'individual', // 'individual' | 'college' | 'department'
+    collegeId: body.collegeId ? sanitizeString(body.collegeId, 50) : null,
     title: sanitizeString(body.title, 200),
     description: sanitizeString(body.description || '', 2000),
     priority: isOneOf(body.priority, ['Low', 'Medium', 'High', 'Critical']) ? body.priority : 'Medium',
     status: 'Pending',
+    startDate: sanitizeString(body.startDate || new Date().toISOString().split('T')[0], 30),
     deadline: sanitizeString(body.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 30),
     comments: [],
     completionProof: null,
@@ -110,10 +117,9 @@ export async function POST(req) {
   await logAdminAction(session, 'CREATE_TASK', 'task', newTask.id, {
     title: newTask.title,
     assignedTo: newTask.userId,
+    scope: newTask.scope,
     priority: newTask.priority,
   });
-
-
 
   return NextResponse.json({ task: newTask });
 }

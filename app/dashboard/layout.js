@@ -1,8 +1,8 @@
 'use client';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, createContext, useContext } from 'react';
-import { ShieldAlert, ShieldCheck, AlertTriangle, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle, X, LogOut, Sun, Moon, ChevronRight, ChevronsLeft, ChevronsRight, Type, Trophy } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, createContext, useContext, Suspense } from 'react';
+import { ShieldAlert, ShieldCheck, AlertTriangle, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle, X, LogOut, Sun, Moon, ChevronRight, ChevronDown, ChevronsLeft, ChevronsRight, Type, Trophy, GraduationCap, Megaphone, DollarSign, UserCheck, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoImg from '../logo.png';
 
@@ -13,10 +13,38 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', desc: 'Overview of all operations and key metrics' },
   { icon: Users, label: 'Employees', path: '/dashboard/employees', desc: 'Manage employee records and profiles' },
   { icon: Layers, label: 'Departments', path: '/dashboard/departments', desc: 'Manage company departments and units' },
-  { icon: Target, label: 'Lead Management', path: '/dashboard/leads', desc: 'View and manage all customer leads' },
-  { icon: PlusCircle, label: 'Add Leads', path: '/dashboard/add-leads', desc: 'Create and assign new leads manually' },
+  // ── Department Groups (expandable) ──
+  {
+    icon: DollarSign, label: 'Sales', desc: 'Sales team management and lead pipeline',
+    isDeptGroup: true,
+    color: '#10b981',
+    children: [
+      { icon: Target, label: 'Lead Management', path: '/dashboard/leads', desc: 'View and manage all customer leads' },
+      { icon: PlusCircle, label: 'Add Leads', path: '/dashboard/add-leads', desc: 'Create and assign new leads manually' },
+      { icon: FileText, label: 'Submissions', path: '/dashboard/reports?dept=Sales', desc: 'Review sales team daily reports' },
+    ],
+  },
+  {
+    icon: Megaphone, label: 'Marketing', desc: 'Marketing campaigns and content management',
+    isDeptGroup: true,
+    color: '#8b5cf6',
+    children: [
+      { icon: FileText, label: 'Submissions', path: '/dashboard/reports?dept=Marketing', desc: 'Review marketing team submissions' },
+    ],
+  },
+  {
+    icon: GraduationCap, label: 'Student Ambassador', desc: 'Campus ambassador program management',
+    isDeptGroup: true,
+    color: '#0ea5e9',
+    children: [
+      { icon: GraduationCap, label: 'Colleges', path: '/dashboard/colleges', desc: 'Manage registered colleges and POC accounts' },
+      { icon: UserCheck, label: 'Onboarding Queue', path: '/dashboard/onboarding', desc: 'Review ambassador onboarding requests' },
+      { icon: BarChart3, label: 'Activity Monitor', path: '/dashboard/ambassador-activity', desc: 'Monitor ambassador activities across all colleges' },
+      { icon: FileText, label: 'Submissions', path: '/dashboard/reports?dept=Student+Ambassador', desc: 'Review ambassador submissions' },
+    ],
+  },
+  // ── General Tools ──
   { icon: ClipboardList, label: 'Task Management', path: '/dashboard/tasks', desc: 'Create, assign, and track employee tasks' },
-  { icon: FileText, label: 'Submissions', path: '/dashboard/reports', desc: 'Review daily reports and form submissions' },
   { icon: CalendarCheck, label: 'Attendance', path: '/dashboard/attendance', desc: 'View employee attendance and manage leave requests' },
   { icon: MessageSquare, label: 'Suggestions', path: '/dashboard/suggestions', desc: 'Review suggestions and feedback from employees' },
   { icon: AlertTriangle, label: 'Alerts', path: '/dashboard/alerts', desc: 'Issue warnings and critical alerts to employees' },
@@ -26,9 +54,27 @@ const navItems = [
   { icon: Settings, label: 'Settings', path: '/dashboard/settings', desc: 'Configure portal settings and your profile' },
 ];
 
-export default function DashboardLayout({ children }) {
+function DashboardLayoutInner({ children }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Helper: check if nav item path matches current URL (supports query params)
+  const isNavActive = (itemPath) => {
+    if (!itemPath) return false;
+    const [basePath, query] = itemPath.split('?');
+    if (query) {
+      // Path with query params — must match both pathname and the query param
+      const params = new URLSearchParams(query);
+      if (pathname !== basePath) return false;
+      for (const [key, val] of params) {
+        if (searchParams.get(key) !== val) return false;
+      }
+      return true;
+    }
+    // Regular path matching
+    return pathname === itemPath || (itemPath !== '/dashboard' && pathname.startsWith(itemPath));
+  };
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [themeMode, setThemeMode] = useState('dark');
@@ -115,6 +161,25 @@ export default function DashboardLayout({ children }) {
     document.documentElement.style.fontSize = sizes[fontSize] || '15px';
     localStorage.setItem('admin_fontSize', fontSize);
   }, [fontSize]);
+
+  // Department group expand/collapse state (must be before early return)
+  const [expandedGroups, setExpandedGroups] = useState({});
+
+  // Auto-expand department group if current page is inside it
+  useEffect(() => {
+    const autoExpand = {};
+    navItems.forEach(item => {
+      if (item.isDeptGroup && item.children) {
+        const hasActivePath = item.children.some(child => isNavActive(child.path));
+        if (hasActivePath) autoExpand[item.label] = true;
+      }
+    });
+    setExpandedGroups(prev => ({ ...prev, ...autoExpand }));
+  }, [pathname]);
+
+  const toggleGroup = (label) => {
+    setExpandedGroups(prev => ({ ...prev, [label]: !prev[label] }));
+  };
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-gradient)' }}>
@@ -227,7 +292,100 @@ export default function DashboardLayout({ children }) {
           {/* Nav Items */}
           <nav style={{ flex: 1, padding: collapsed ? '0 6px' : '0 10px', overflowY: 'auto' }}>
             {filteredNav.map((item) => {
-              const active = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(item.path));
+              // ── EXPANDABLE DEPARTMENT GROUP ──
+              if (item.isDeptGroup && item.children) {
+                const isOpen = !!expandedGroups[item.label];
+                const hasActiveChild = item.children.some(child => isNavActive(child.path));
+
+                return (
+                  <div key={item.label} style={{ marginBottom: 2 }}>
+                    {/* Group Header — clickable to expand/collapse */}
+                    <button
+                      onClick={() => toggleGroup(item.label)}
+                      onMouseEnter={() => setHoveredTab(item)}
+                      onMouseLeave={() => setHoveredTab(null)}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10,
+                        padding: collapsed ? '10px 0' : '9px 12px',
+                        justifyContent: collapsed ? 'center' : 'flex-start',
+                        width: '100%', border: 'none', cursor: 'pointer',
+                        color: hasActiveChild ? 'var(--primary)' : 'var(--sidebar-text)',
+                        background: hasActiveChild && !isOpen ? 'var(--sidebar-active)' : 'transparent',
+                        fontWeight: hasActiveChild ? 600 : 500, fontSize: '0.84rem', borderRadius: 10,
+                        transition: 'all 0.2s ease', position: 'relative',
+                      }}
+                    >
+                      {hasActiveChild && (
+                        <div style={{
+                          position: 'absolute', left: 0, top: '15%', bottom: '15%', width: 3,
+                          borderRadius: 2, background: item.color || 'var(--primary)',
+                          boxShadow: `0 0 8px ${item.color || 'var(--primary-glow)'}40`,
+                        }} />
+                      )}
+                      <div style={{
+                        width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                        background: `${item.color || 'var(--primary)'}18`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <item.icon size={14} color={item.color || 'var(--primary)'} />
+                      </div>
+                      {!collapsed && (
+                        <>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, textAlign: 'left' }}>{item.label}</span>
+                          <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                            <ChevronDown size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+                          </motion.div>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Sub-items (collapsible) */}
+                    <AnimatePresence initial={false}>
+                      {isOpen && !collapsed && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2, ease: 'easeInOut' }}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          <div style={{
+                            marginLeft: 18, paddingLeft: 14,
+                            borderLeft: `2px solid ${item.color || 'var(--primary)'}30`,
+                          }}>
+                            {item.children.map(child => {
+                              const childActive = isNavActive(child.path);
+                              return (
+                                <Link key={child.path} href={child.path}
+                                  onMouseEnter={() => setHoveredTab(child)}
+                                  onMouseLeave={() => setHoveredTab(null)}
+                                  onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 10,
+                                    padding: '7px 10px', textDecoration: 'none',
+                                    color: childActive ? item.color || 'var(--primary)' : 'var(--sidebar-text)',
+                                    background: childActive ? `${item.color || 'var(--primary)'}12` : 'transparent',
+                                    fontWeight: childActive ? 600 : 450, fontSize: '0.8rem', borderRadius: 8,
+                                    marginBottom: 1, transition: 'all 0.2s ease',
+                                    position: 'relative',
+                                  }}
+                                >
+                                  <child.icon size={15} style={{ flexShrink: 0, opacity: 0.75 }} />
+                                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{child.label}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              }
+
+              // ── REGULAR NAV ITEM ──
+              const active = isNavActive(item.path);
               return (
                 <Link key={item.path} href={item.path} 
                   onMouseEnter={() => setHoveredTab(item)}
@@ -538,5 +696,17 @@ export default function DashboardLayout({ children }) {
         button:hover { filter: brightness(1.05); }
       `}</style>
     </ThemeContext.Provider>
+  );
+}
+
+export default function DashboardLayout({ children }) {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-gradient)' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading...</p>
+      </div>
+    }>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </Suspense>
   );
 }

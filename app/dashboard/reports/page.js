@@ -1,9 +1,13 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileText, Calendar, User, Check, X, MessageSquare, ChevronDown, ChevronRight, Building2, Users, Layers } from 'lucide-react';
 
 export default function ReportsPage() {
+  const searchParams = useSearchParams();
+  const deptFilter = searchParams.get('dept') || '';
+  
   const [reports, setReports] = useState([]);
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -19,10 +23,18 @@ export default function ReportsPage() {
 
   useEffect(() => { load(); }, []);
 
+  // Auto-expand the filtered department
+  useEffect(() => {
+    if (deptFilter) {
+      setExpandedDepts(prev => ({ ...prev, [deptFilter]: true }));
+    }
+  }, [deptFilter]);
+
   const filtered = reports.filter(r => {
     const matchType = filterType ? r.formType === filterType : true;
     const matchStatus = filterStatus ? r.status === filterStatus : true;
-    return matchType && matchStatus;
+    const matchDept = deptFilter ? (r.employeeDept || 'Unknown') === deptFilter : true;
+    return matchType && matchStatus && matchDept;
   });
 
   const formTypes = [...new Set(reports.map(r => r.formType))];
@@ -97,8 +109,8 @@ export default function ReportsPage() {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Employee Submissions</h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>Grouped by Department → Type → Employee</p>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{deptFilter ? `${deptFilter} Submissions` : 'Employee Submissions'}</h2>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>{deptFilter ? `Filtered to ${deptFilter} department` : 'Grouped by Department → Type → Employee'}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {pendingCount > 0 && <span className="badge badge-warning">{pendingCount} pending review</span>}
