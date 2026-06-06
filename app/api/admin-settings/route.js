@@ -63,6 +63,10 @@ export async function PUT(req) {
     update.notifDailyReport = body.notifDailyReport !== false;
     update.notifLoginAlert = body.notifLoginAlert !== false;
   }
+  if (body.type === 'fontSize') {
+    const parsed = parseInt(body.fontSize, 10);
+    update.fontSize = !isNaN(parsed) ? parsed : 15;
+  }
 
   await db.collection('user_settings').updateOne(
     { userId: session.id },

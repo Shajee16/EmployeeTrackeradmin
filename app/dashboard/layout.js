@@ -1,8 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, createContext, useContext, Suspense } from 'react';
-import { ShieldAlert, ShieldCheck, AlertTriangle, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle, X, LogOut, Sun, Moon, ChevronRight, ChevronDown, ChevronsLeft, ChevronsRight, Type, Trophy, GraduationCap, Megaphone, DollarSign, UserCheck, BarChart3 } from 'lucide-react';
+import { useEffect, useState, createContext, useContext, Suspense, useRef } from 'react';
+import { ShieldAlert, ShieldCheck, AlertTriangle, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle, X, LogOut, Sun, Moon, ChevronRight, ChevronDown, ChevronsLeft, ChevronsRight, Type, Trophy, GraduationCap, Megaphone, DollarSign, UserCheck, BarChart3, Monitor, Minus, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoImg from '../logo.png';
 
@@ -82,10 +82,17 @@ function DashboardLayoutInner({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
-  const [fontSize, setFontSize] = useState('medium'); // small, medium, large
-  const [showAccessibility, setShowAccessibility] = useState(false);
+  const [fontSize, setFontSize] = useState(15); // default to 15px
   const [hoveredTab, setHoveredTab] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
+  const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
+  const [fontSizeDropdownOpen, setFontSizeDropdownOpen] = useState(false);
+
+  const themeRef = useRef(null);
+  const colorRef = useRef(null);
+  const fontSizeRef = useRef(null);
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
@@ -103,11 +110,7 @@ function DashboardLayoutInner({ children }) {
         
         const handleNotifRead = () => fetchUnread();
         window.addEventListener('notificationsRead', handleNotifRead);
-        
-        return () => {
-          clearInterval(poll);
-          window.removeEventListener('notificationsRead', handleNotifRead);
-        };
+
         fetch('/api/admin-settings').then(r => r.json()).then(sd => {
           if (sd.settings?.profilePicture) {
             setUser(u => ({ ...u, profilePicture: sd.settings.profilePicture }));
@@ -117,7 +120,13 @@ function DashboardLayoutInner({ children }) {
           }
           if (sd.settings?.themeMode) setThemeMode(sd.settings.themeMode);
           if (sd.settings?.themeColor) setThemeColor(sd.settings.themeColor);
+          if (sd.settings?.fontSize) setFontSize(sd.settings.fontSize);
         }).catch(() => {});
+        
+        return () => {
+          clearInterval(poll);
+          window.removeEventListener('notificationsRead', handleNotifRead);
+        };
       }
     }).catch(() => router.push('/login'));
     const savedMode = localStorage.getItem('admin_themeMode');
@@ -128,8 +137,34 @@ function DashboardLayoutInner({ children }) {
     if (savedColor) setThemeColor(savedColor);
     else document.documentElement.setAttribute('data-theme', 'dark');
     if (savedCollapsed === 'true') setCollapsed(true);
-    if (savedFontSize) setFontSize(savedFontSize);
+    if (savedFontSize) {
+      if (savedFontSize === 'small') setFontSize(13);
+      else if (savedFontSize === 'medium') setFontSize(15);
+      else if (savedFontSize === 'large') setFontSize(17);
+      else {
+        const parsed = parseInt(savedFontSize, 10);
+        if (!isNaN(parsed)) setFontSize(parsed);
+      }
+    }
   }, [router]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (themeRef.current && !themeRef.current.contains(event.target)) {
+        setThemeDropdownOpen(false);
+      }
+      if (colorRef.current && !colorRef.current.contains(event.target)) {
+        setColorDropdownOpen(false);
+      }
+      if (fontSizeRef.current && !fontSizeRef.current.contains(event.target)) {
+        setFontSizeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     let mode = themeMode;
@@ -157,9 +192,21 @@ function DashboardLayoutInner({ children }) {
 
   // Font size accessibility
   useEffect(() => {
-    const sizes = { small: '13px', medium: '15px', large: '17px' };
-    document.documentElement.style.fontSize = sizes[fontSize] || '15px';
-    localStorage.setItem('admin_fontSize', fontSize);
+    let sizePx = '15px';
+    if (typeof fontSize === 'number') {
+      sizePx = `${fontSize}px`;
+    } else if (fontSize === 'small') {
+      sizePx = '13px';
+    } else if (fontSize === 'medium') {
+      sizePx = '15px';
+    } else if (fontSize === 'large') {
+      sizePx = '17px';
+    } else {
+      const parsed = parseInt(fontSize, 10);
+      sizePx = !isNaN(parsed) ? `${parsed}px` : '15px';
+    }
+    document.documentElement.style.fontSize = sizePx;
+    localStorage.setItem('admin_fontSize', fontSize.toString());
   }, [fontSize]);
 
   // Department group expand/collapse state (must be before early return)
@@ -198,7 +245,7 @@ function DashboardLayoutInner({ children }) {
   const filteredNav = navItems.filter(item => !item.superOnly || user?.role === 'Super Admin');
 
   return (
-    <ThemeContext.Provider value={{ theme: themeMode, setTheme: setThemeMode, themeColor, setThemeColor, user, setUser }}>
+    <ThemeContext.Provider value={{ theme: themeMode, setTheme: setThemeMode, themeColor, setThemeColor, fontSize, setFontSize, user, setUser }}>
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-gradient)', backgroundAttachment: 'fixed' }}>
 
         {/* ═══════ MOBILE OVERLAY ═══════ */}
@@ -518,93 +565,351 @@ function DashboardLayoutInner({ children }) {
 
             {/* Right side */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Theme color pills */}
-              <div className="theme-pills" style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                background: 'var(--surface)', border: '1px solid var(--surface-border)',
-                padding: '4px 6px', borderRadius: 20,
-              }}>
-                {[
-                  { key: 'beige', color: '#b8895e' },
-                  { key: 'seafoam', color: '#4a9880' },
-                  { key: 'rose', color: '#be6b82' },
-                ].map(({ key, color }) => (
-                  <button key={key} onClick={() => setThemeColor(key)}
-                    style={{
-                      width: 20, height: 20, borderRadius: '50%',
-                      border: themeColor === key ? '2.5px solid var(--text)' : '2px solid transparent',
-                      background: color, cursor: 'pointer', transition: 'all 0.25s',
-                      transform: themeColor === key ? 'scale(1.15)' : 'scale(1)',
-                      boxShadow: themeColor === key ? `0 0 8px ${color}40` : 'none',
-                    }}
-                    title={`Theme: ${key}`} />
-                ))}
-              </div>
+              {/* Color Palette Dropdown */}
+              {(() => {
+                const activeColorObj = [
+                  { key: 'beige', color: '#c29b76', label: 'Beige Theme' },
+                  { key: 'seafoam', color: '#5b9e8c', label: 'Seafoam Theme' },
+                  { key: 'rose', color: '#c97a8e', label: 'Rose Theme' },
+                ].find(c => c.key === themeColor) || { key: 'beige', color: '#c29b76', label: 'Beige Theme' };
+                return (
+                  <div ref={colorRef} onMouseEnter={() => setColorDropdownOpen(true)} onMouseLeave={() => setColorDropdownOpen(false)} style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => {
+                        setColorDropdownOpen(!colorDropdownOpen);
+                        setThemeDropdownOpen(false);
+                        setFontSizeDropdownOpen(false);
+                      }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--surface-border)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                      title={`Color Palette: ${activeColorObj.label}`}
+                    >
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', background: activeColorObj.color, border: '1px solid rgba(0,0,0,0.1)' }} />
+                    </button>
 
-              {/* Light/Dark toggle */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 2,
-                background: 'var(--surface)', border: '1px solid var(--surface-border)',
-                padding: '3px', borderRadius: 20,
-              }}>
-                {[
-                  { mode: 'light', icon: <Sun size={13} /> },
-                  { mode: 'dark', icon: <Moon size={13} /> },
-                ].map(({ mode, icon }) => (
-                  <button key={mode} onClick={() => setThemeMode(mode)}
-                    style={{
-                      width: 28, height: 28, borderRadius: '50%', border: 'none',
-                      background: themeMode === mode ? 'var(--primary-glow)' : 'transparent',
-                      cursor: 'pointer', transition: 'all 0.25s',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: themeMode === mode ? 'var(--primary)' : 'var(--text-muted)',
-                    }}
-                    title={`Mode: ${mode}`}>{icon}</button>
-                ))}
-              </div>
+                    {colorDropdownOpen && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 'calc(100% - 4px)',
+                        right: 0,
+                        padding: '12px 0px',
+                        zIndex: 100,
+                      }}>
+                        <div style={{
+                          width: 200,
+                          background: 'var(--surface)',
+                          border: '1px solid var(--surface-border)',
+                          borderRadius: 12,
+                          boxShadow: 'var(--shadow-lg)',
+                          padding: 6,
+                          backdropFilter: 'blur(24px)',
+                        }}>
+                          {[
+                            { key: 'beige', color: '#c29b76', label: 'Beige Theme' },
+                            { key: 'seafoam', color: '#5b9e8c', label: 'Seafoam Theme' },
+                            { key: 'rose', color: '#c97a8e', label: 'Rose Theme' },
+                          ].map(({ key, color, label }) => {
+                            const isSelected = themeColor === key;
+                            return (
+                              <button
+                                key={key}
+                                onClick={async () => {
+                                  setThemeColor(key);
+                                  setColorDropdownOpen(false);
+                                  await fetch('/api/admin-settings', {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ type: 'themeColor', themeColor: key }),
+                                  });
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 10,
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  background: isSelected ? 'var(--sidebar-active)' : 'transparent',
+                                  border: 'none',
+                                  borderRadius: 8,
+                                  color: isSelected ? 'var(--primary)' : 'var(--text)',
+                                  fontSize: '0.8rem',
+                                  fontWeight: isSelected ? 700 : 500,
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s',
+                                }}
+                                onMouseEnter={e => {
+                                  if (!isSelected) e.currentTarget.style.background = 'var(--sidebar-active)';
+                                }}
+                                onMouseLeave={e => {
+                                  if (!isSelected) e.currentTarget.style.background = 'transparent';
+                                }}
+                              >
+                                <div style={{ width: 14, height: 14, borderRadius: '50%', background: color, border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                                <span>{label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
-              {/* Font Size Accessibility */}
-              <div style={{ position: 'relative' }}>
-                <button onClick={() => setShowAccessibility(v => !v)} style={{
-                  background: 'var(--surface)', border: '1px solid var(--surface-border)',
-                  color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 10,
-                  width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.2s',
-                }} title="Accessibility">
+              {/* Theme Mode Dropdown */}
+              {(() => {
+                const activeModeObj = [
+                  { key: 'light', icon: Sun, label: 'Light Mode' },
+                  { key: 'system', icon: Monitor, label: 'System Default' },
+                  { key: 'dark', icon: Moon, label: 'Dark Mode' },
+                ].find(m => m.key === themeMode) || { key: 'system', icon: Monitor, label: 'System Default' };
+                const ActiveIcon = activeModeObj.icon;
+                return (
+                  <div ref={themeRef} onMouseEnter={() => setThemeDropdownOpen(true)} onMouseLeave={() => setThemeDropdownOpen(false)} style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => {
+                        setThemeDropdownOpen(!themeDropdownOpen);
+                        setColorDropdownOpen(false);
+                        setFontSizeDropdownOpen(false);
+                      }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--surface-border)',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                      title={`Theme Mode: ${activeModeObj.label}`}
+                    >
+                      <ActiveIcon size={16} />
+                    </button>
+
+                    {themeDropdownOpen && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 'calc(100% - 4px)',
+                        right: 0,
+                        padding: '12px 0px',
+                        zIndex: 100,
+                      }}>
+                        <div style={{
+                          width: 180,
+                          background: 'var(--surface)',
+                          border: '1px solid var(--surface-border)',
+                          borderRadius: 12,
+                          boxShadow: 'var(--shadow-lg)',
+                          padding: 6,
+                          backdropFilter: 'blur(24px)',
+                        }}>
+                          {[
+                            { key: 'light', icon: Sun, label: 'Light Mode' },
+                            { key: 'system', icon: Monitor, label: 'System Default' },
+                            { key: 'dark', icon: Moon, label: 'Dark Mode' },
+                          ].map(({ key, icon: OptionIcon, label }) => {
+                            const isSelected = themeMode === key;
+                            return (
+                              <button
+                                key={key}
+                                onClick={async () => {
+                                  setThemeMode(key);
+                                  setThemeDropdownOpen(false);
+                                  await fetch('/api/admin-settings', {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ type: 'theme', theme: key }),
+                                  });
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 10,
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  background: isSelected ? 'var(--sidebar-active)' : 'transparent',
+                                  border: 'none',
+                                  borderRadius: 8,
+                                  color: isSelected ? 'var(--primary)' : 'var(--text)',
+                                  fontSize: '0.8rem',
+                                  fontWeight: isSelected ? 700 : 500,
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s',
+                                }}
+                                onMouseEnter={e => {
+                                  if (!isSelected) e.currentTarget.style.background = 'var(--sidebar-active)';
+                                }}
+                                onMouseLeave={e => {
+                                  if (!isSelected) e.currentTarget.style.background = 'transparent';
+                                }}
+                              >
+                                <OptionIcon size={14} color={isSelected ? 'var(--primary)' : 'var(--text-muted)'} />
+                                <span>{label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Font Size Dropdown */}
+              <div ref={fontSizeRef} onMouseEnter={() => setFontSizeDropdownOpen(true)} onMouseLeave={() => setFontSizeDropdownOpen(false)} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => {
+                    setFontSizeDropdownOpen(!fontSizeDropdownOpen);
+                    setThemeDropdownOpen(false);
+                    setColorDropdownOpen(false);
+                  }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--surface-border)',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                  title="Font Size"
+                >
                   <Type size={16} />
                 </button>
-                {showAccessibility && (
-                  <>
-                    <div onClick={() => setShowAccessibility(false)} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />
+
+                {fontSizeDropdownOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% - 4px)',
+                    right: 0,
+                    padding: '12px 0px',
+                    zIndex: 100,
+                  }}>
                     <div style={{
-                      position: 'absolute', top: 44, right: 0, zIndex: 99,
-                      background: 'var(--surface)', border: '1px solid var(--surface-border)',
-                      borderRadius: 14, padding: 16, minWidth: 200,
-                      boxShadow: 'var(--shadow-lg)', backdropFilter: 'blur(24px)',
+                      width: 200,
+                      background: 'var(--surface)',
+                      border: '1px solid var(--surface-border)',
+                      borderRadius: 12,
+                      boxShadow: 'var(--shadow-lg)',
+                      padding: 12,
+                      backdropFilter: 'blur(24px)',
                     }}>
                       <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Font Size</p>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {[
-                          { key: 'small', label: 'A', size: '0.78rem' },
-                          { key: 'medium', label: 'A', size: '0.92rem' },
-                          { key: 'large', label: 'A', size: '1.12rem' },
-                        ].map(f => (
-                          <button key={f.key} onClick={() => { setFontSize(f.key); setShowAccessibility(false); }}
-                            style={{
-                              flex: 1, padding: '8px 6px', borderRadius: 8,
-                              border: fontSize === f.key ? '2px solid var(--primary)' : '1px solid var(--surface-border)',
-                              background: fontSize === f.key ? 'var(--primary-glow)' : 'var(--surface-glass)',
-                              cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                              alignItems: 'center', gap: 4, transition: 'all 0.2s',
-                              color: fontSize === f.key ? 'var(--primary)' : 'var(--text)',
-                            }}>
-                            <span style={{ fontSize: f.size, fontWeight: 700 }}>{f.label}</span>
-                            <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{f.key}</span>
-                          </button>
-                        ))}
-                      </div>
+                      
+                      {(() => {
+                        const fontSizes = [
+                          { size: 12, label: 'Smallest' },
+                          { size: 13, label: 'Extra Small' },
+                          { size: 14, label: 'Small' },
+                          { size: 15, label: 'Default' },
+                          { size: 16, label: 'Medium' },
+                          { size: 17, label: 'Medium-Large' },
+                          { size: 18, label: 'Large' },
+                          { size: 20, label: 'Extra Large' },
+                          { size: 22, label: 'XXL' },
+                          { size: 24, label: 'Largest' }
+                        ];
+                        
+                        let currentIndex = fontSizes.findIndex(f => f.size === fontSize);
+                        if (currentIndex === -1) {
+                          let sizeVal = 15;
+                          if (fontSize === 'small') sizeVal = 13;
+                          else if (fontSize === 'medium') sizeVal = 15;
+                          else if (fontSize === 'large') sizeVal = 17;
+                          else {
+                            const parsed = parseInt(fontSize, 10);
+                            if (!isNaN(parsed)) sizeVal = parsed;
+                          }
+                          currentIndex = fontSizes.findIndex(f => f.size === sizeVal);
+                          if (currentIndex === -1) currentIndex = 3;
+                        }
+
+                        const currentObj = fontSizes[currentIndex];
+
+                        const changeSize = async (newIndex) => {
+                          if (newIndex >= 0 && newIndex < fontSizes.length) {
+                            const nextObj = fontSizes[newIndex];
+                            setFontSize(nextObj.size);
+                            await fetch('/api/admin-settings', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ type: 'fontSize', fontSize: nextObj.size }),
+                            });
+                          }
+                        };
+
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'var(--surface-hover)', padding: '6px 8px', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
+                            <button
+                              disabled={currentIndex === 0}
+                              onClick={() => changeSize(currentIndex - 1)}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 6,
+                                background: 'var(--surface)',
+                                border: '1px solid var(--surface-border)',
+                                color: currentIndex === 0 ? 'var(--text-muted)' : 'var(--text)',
+                                cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
+                                opacity: currentIndex === 0 ? 0.5 : 1,
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <Minus size={12} />
+                            </button>
+
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)', textAlign: 'center', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {currentObj.label}
+                            </span>
+
+                            <button
+                              disabled={currentIndex === fontSizes.length - 1}
+                              onClick={() => changeSize(currentIndex + 1)}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 6,
+                                background: 'var(--surface)',
+                                border: '1px solid var(--surface-border)',
+                                color: currentIndex === fontSizes.length - 1 ? 'var(--text-muted)' : 'var(--text)',
+                                cursor: currentIndex === fontSizes.length - 1 ? 'not-allowed' : 'pointer',
+                                opacity: currentIndex === fontSizes.length - 1 ? 0.5 : 1,
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
 

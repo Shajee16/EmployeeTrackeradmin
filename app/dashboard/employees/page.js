@@ -345,9 +345,9 @@ export default function EmployeesPage() {
                 {expandedDepts[dept] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
               </div>
               
-              <AnimatePresence>
+              <AnimatePresence initial={false}>
                 {expandedDepts[dept] && (
-                  <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
+                  <motion.div key={`dept-content-${dept}`} initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <tbody>
                         {emps.map(e => {
@@ -355,7 +355,7 @@ export default function EmployeesPage() {
                           const onlineInfo = onlineMap[e.id];
                           return (
                           <tr key={e.id} style={{ borderBottom: '1px solid var(--surface-border)', opacity: e.status === 'away' ? 0.6 : 1 }}>
-                            <td style={{ padding: '16px 20px' }}>
+                            <td style={{ padding: '16px 20px', verticalAlign: 'middle' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 {/* Online indicator dot */}
                                 <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -377,46 +377,46 @@ export default function EmployeesPage() {
                                 <div>
                                   <div style={{ fontWeight: 600, fontSize: '1rem' }}>{e.name}</div>
                                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{e.id ? <span style={{fontWeight: 600}}>{e.id}</span> : ''} {e.id ? '•' : ''} {e.email}</div>
-                                  {targetMap[e.id] && (
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
-                                      <Target size={10} /> Target: ₹{Number(targetMap[e.id].monthlyTarget).toLocaleString('en-IN')}
-                                    </div>
-                                  )}
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                                    {targetMap[e.id] && (
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                        <Target size={10} /> Target: ₹{Number(targetMap[e.id].monthlyTarget).toLocaleString('en-IN')}
+                                      </div>
+                                    )}
+                                    {digilockerMap[e.id] && digilockerMap[e.id].verified ? (
+                                      <div
+                                        style={{
+                                          display: 'inline-flex', alignItems: 'center', gap: 5,
+                                          padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700,
+                                          background: 'rgba(5,150,105,0.08)', color: '#059669',
+                                          border: '1px solid rgba(5,150,105,0.2)',
+                                          cursor: 'pointer', transition: 'all 0.2s',
+                                        }}
+                                        onClick={(ev) => { ev.stopPropagation(); viewDigilocker(e); }}
+                                        title="Click to view DigiLocker details"
+                                      >
+                                        <ShieldCheck size={11} />
+                                        DigiLocker Verified
+                                      </div>
+                                    ) : (
+                                      <div
+                                        style={{
+                                          display: 'inline-flex', alignItems: 'center', gap: 5,
+                                          padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600,
+                                          background: 'rgba(107,114,128,0.06)', color: '#9ca3af',
+                                          border: '1px solid rgba(107,114,128,0.12)',
+                                        }}
+                                      >
+                                        <ShieldX size={11} />
+                                        Not Verified
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                              {/* DigiLocker Badge */}
-                              {digilockerMap[e.id] && digilockerMap[e.id].verified && (
-                                <div
-                                  style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4,
-                                    padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700,
-                                    background: 'rgba(5,150,105,0.08)', color: '#059669',
-                                    border: '1px solid rgba(5,150,105,0.2)',
-                                    cursor: 'pointer', transition: 'all 0.2s',
-                                  }}
-                                  onClick={(ev) => { ev.stopPropagation(); viewDigilocker(e); }}
-                                  title="Click to view DigiLocker details"
-                                >
-                                  <ShieldCheck size={11} />
-                                  DigiLocker Verified
-                                </div>
-                              )}
-                              {!digilockerMap[e.id]?.verified && (
-                                <div
-                                  style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4,
-                                    padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600,
-                                    background: 'rgba(107,114,128,0.06)', color: '#9ca3af',
-                                    border: '1px solid rgba(107,114,128,0.12)',
-                                  }}
-                                >
-                                  <ShieldX size={11} />
-                                  Not Verified
-                                </div>
-                              )}
                             </td>
-                            <td style={{ padding: '16px 20px', color: 'var(--text-muted)' }}>{e.designation || e.role}</td>
-                            <td style={{ padding: '16px 20px' }}>
+                            <td style={{ padding: '16px 20px', color: 'var(--text-muted)', verticalAlign: 'middle' }}>{e.designation || e.role}</td>
+                            <td style={{ padding: '16px 20px', verticalAlign: 'middle' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 <span className={`badge ${e.status === 'away' ? 'badge-warning' : 'badge-success'}`}>{e.status === 'away' ? 'Away' : 'Active'}</span>
                                 <span style={{
@@ -438,8 +438,8 @@ export default function EmployeesPage() {
                                 )}
                               </div>
                             </td>
-                            <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <td style={{ padding: '16px 20px', textAlign: 'right', verticalAlign: 'middle' }}>
+                              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
                                 <button className="btn btn-primary" style={{ padding: '6px 12px' }} onClick={() => viewActivity(e)}>
                                   <Activity size={16} /> View Activity
                                 </button>
@@ -452,16 +452,20 @@ export default function EmployeesPage() {
                                 <button className="btn btn-outline" style={{ padding: '6px 12px', color: e.hideFromLeaderboard ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => toggleLeaderboard(e.id, !e.hideFromLeaderboard)} title={e.hideFromLeaderboard ? "Show on Leaderboard" : "Hide from Leaderboard"}>
                                   {e.hideFromLeaderboard ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
-                                 {user?.role === 'Super Admin' && digilockerMap[e.id]?.verified && (
-                                  <button 
-                                    className="btn btn-outline" 
-                                    style={{ padding: '6px 12px', color: '#dc2626', borderColor: 'rgba(220, 38, 38, 0.25)' }} 
-                                    onClick={() => unlinkDigilocker(e.id, e.name)}
-                                    title="Unlink DigiLocker Verification"
-                                  >
-                                    <Link2Off size={16} />
-                                  </button>
-                                )}
+                                 {user?.role === 'Super Admin' && (
+                                   digilockerMap[e.id]?.verified ? (
+                                     <button 
+                                       className="btn btn-outline" 
+                                       style={{ padding: '6px 12px', color: '#dc2626', borderColor: 'rgba(220, 38, 38, 0.25)' }} 
+                                       onClick={() => unlinkDigilocker(e.id, e.name)}
+                                       title="Unlink DigiLocker Verification"
+                                     >
+                                       <Link2Off size={16} />
+                                     </button>
+                                   ) : (
+                                     <div style={{ width: 42, height: 32, flexShrink: 0 }} />
+                                   )
+                                 )}
                                 <button className="btn btn-danger" style={{ padding: '6px 12px' }} onClick={() => confirmDelete(e.id, e.name)}>
                                   <UserX size={16} />
                                 </button>
