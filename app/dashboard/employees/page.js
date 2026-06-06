@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Target } from 'lucide-react';
+import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Target, ShieldCheck, ShieldX } from 'lucide-react';
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState([]);
@@ -37,18 +37,42 @@ export default function EmployeesPage() {
   const [onlineMap, setOnlineMap] = useState({});
   const [onlineFilter, setOnlineFilter] = useState(''); // '' | 'online' | 'offline'
   const pollRef = useRef(null);
+  const initialLoadDone = useRef(false);
+
+  // DigiLocker verification states
+  const [digilockerMap, setDigilockerMap] = useState({});
+  const [digilockerModal, setDigilockerModal] = useState(null);
+  const [digilockerDetail, setDigilockerDetail] = useState(null);
+  const [loadingDigilocker, setLoadingDigilocker] = useState(false);
 
   const load = () => {
     fetch('/api/admin-employees').then(r => r.json()).then(d => setEmployees(d.employees || []));
     fetch('/api/admin-departments').then(r => r.json()).then(d => {
       setSavedDepartments(d.departments || []);
-      const initialExpanded = {};
-      (d.departments || []).forEach(dept => {
-        initialExpanded[dept.name] = true;
-      });
-      setExpandedDepts(initialExpanded);
+      if (!initialLoadDone.current) {
+        // First load: expand all departments by default
+        const initialExpanded = {};
+        (d.departments || []).forEach(dept => {
+          initialExpanded[dept.name] = true;
+        });
+        setExpandedDepts(initialExpanded);
+        initialLoadDone.current = true;
+      } else {
+        // Subsequent polls: only add newly-created departments as expanded,
+        // without resetting the user's manual toggle state
+        setExpandedDepts(prev => {
+          const updated = { ...prev };
+          (d.departments || []).forEach(dept => {
+            if (!(dept.name in updated)) {
+              updated[dept.name] = true;
+            }
+          });
+          return updated;
+        });
+      }
     });
     fetch('/api/admin-employees/targets').then(r => r.json()).then(d => setTargetMap(d.targets || {})).catch(() => {});
+    fetch('/api/admin-digilocker').then(r => r.json()).then(d => setDigilockerMap(d.verifications || {})).catch(() => {});
   };
 
   useEffect(() => {
@@ -135,6 +159,20 @@ export default function EmployeesPage() {
     const data = await res.json();
     setActivityData(data);
     setLoadingActivity(false);
+  };
+
+  const viewDigilocker = async (emp) => {
+    setDigilockerModal(emp);
+    setDigilockerDetail(null);
+    setLoadingDigilocker(true);
+    try {
+      const res = await fetch(`/api/admin-digilocker?employeeId=${emp.id}`);
+      const data = await res.json();
+      setDigilockerDetail(data);
+    } catch {
+      setDigilockerDetail({ verified: false });
+    }
+    setLoadingDigilocker(false);
   };
 
   const toggleDept = (dept) => {
@@ -293,6 +331,36 @@ export default function EmployeesPage() {
                                   )}
                                 </div>
                               </div>
+                              {/* DigiLocker Badge */}
+                              {digilockerMap[e.id] && digilockerMap[e.id].verified && (
+                                <div
+                                  style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4,
+                                    padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700,
+                                    background: 'rgba(5,150,105,0.08)', color: '#059669',
+                                    border: '1px solid rgba(5,150,105,0.2)',
+                                    cursor: 'pointer', transition: 'all 0.2s',
+                                  }}
+                                  onClick={(ev) => { ev.stopPropagation(); viewDigilocker(e); }}
+                                  title="Click to view DigiLocker details"
+                                >
+                                  <ShieldCheck size={11} />
+                                  DigiLocker Verified
+                                </div>
+                              )}
+                              {!digilockerMap[e.id]?.verified && (
+                                <div
+                                  style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4,
+                                    padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600,
+                                    background: 'rgba(107,114,128,0.06)', color: '#9ca3af',
+                                    border: '1px solid rgba(107,114,128,0.12)',
+                                  }}
+                                >
+                                  <ShieldX size={11} />
+                                  Not Verified
+                                </div>
+                              )}
                             </td>
                             <td style={{ padding: '16px 20px', color: 'var(--text-muted)' }}>{e.designation || e.role}</td>
                             <td style={{ padding: '16px 20px' }}>
@@ -827,6 +895,156 @@ export default function EmployeesPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ═══════ DIGILOCKER VERIFICATION DETAIL MODAL ═══════ */}
+      {digilockerModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setDigilockerModal(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="card" style={{ width: 800, maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            {/* Header with gradient */}
+            <div style={{
+              padding: '20px 24px',
+              background: digilockerDetail?.verified
+                ? 'linear-gradient(135deg, #059669, #10b981)'
+                : 'linear-gradient(135deg, #6b7280, #9ca3af)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <svg width="32" height="32" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="64" height="64" rx="12" fill="rgba(255,255,255,0.2)"/>
+                  <path d="M20 18h8c6.627 0 12 5.373 12 12v0c0 6.627-5.373 12-12 12h-8V18z" stroke="#fff" strokeWidth="3" fill="none"/>
+                  <rect x="34" y="22" width="10" height="20" rx="3" stroke="#fff" strokeWidth="2.5" fill="none"/>
+                  <circle cx="39" cy="34" r="2" fill="#fff"/>
+                  <line x1="39" y1="34" x2="39" y2="38" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <div>
+                  <h3 style={{ color: '#fff', fontWeight: 800, fontSize: '1.15rem', margin: 0 }}>
+                    DigiLocker Verification
+                  </h3>
+                  <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.82rem', margin: '2px 0 0', fontWeight: 500 }}>
+                    {digilockerModal.name} · {digilockerModal.id}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setDigilockerModal(null)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} color="#fff" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+              {loadingDigilocker ? (
+                <div style={{ textAlign: 'center', padding: 50, color: 'var(--text-muted)' }}>Loading DigiLocker data...</div>
+              ) : digilockerDetail?.verified ? (
+                <>
+                  {/* Status Banner */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px',
+                    background: 'rgba(5,150,105,0.06)', border: '1.5px solid rgba(5,150,105,0.2)',
+                    borderRadius: 14, marginBottom: 24,
+                  }}>
+                    <ShieldCheck size={22} color="#059669" />
+                    <div>
+                      <p style={{ fontWeight: 700, color: '#059669', fontSize: '0.92rem', margin: 0 }}>Identity Verified via DigiLocker</p>
+                      <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                        Verified on {new Date(digilockerDetail.verifiedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Identity Details Grid */}
+                  <h4 style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>Identity Details</h4>
+                  
+                  {digilockerDetail.photo && (
+                    <div style={{ marginBottom: 20 }}>
+                      <img src={`data:image/jpeg;base64,${digilockerDetail.photo}`} alt="Profile" style={{ width: 80, height: 80, borderRadius: 12, objectFit: 'cover', border: '2px solid var(--surface-border)' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 28 }}>
+                    {[
+                      { label: 'DigiLocker Username', value: digilockerDetail.username, highlight: true },
+                      { label: 'Full Name', value: digilockerDetail.name },
+                      { label: 'Age', value: digilockerDetail.age },
+                      { label: 'Date of Birth', value: digilockerDetail.dob },
+                      { label: 'Gender', value: digilockerDetail.gender === 'M' ? 'Male' : digilockerDetail.gender === 'F' ? 'Female' : digilockerDetail.gender },
+                      { label: 'Aadhaar', value: digilockerDetail.aadhaar, mono: true },
+                      { label: 'PAN', value: digilockerDetail.pan, mono: true, highlight: true },
+                      { label: 'Driving Licence', value: digilockerDetail.dl_no, mono: true, highlight: true },
+                      { label: 'Mobile', value: digilockerDetail.mobile },
+                      { label: 'Email', value: digilockerDetail.email },
+                      { label: 'DigiLocker ID', value: digilockerDetail.digilockerid, mono: true, highlight: true },
+                      { label: 'Reference Key', value: digilockerDetail.reference_key, mono: true, highlight: true },
+                    ].filter(f => f.value).map(field => (
+                      <div key={field.label} style={{ padding: '12px 14px', background: field.highlight ? 'rgba(59,130,246,0.05)' : 'var(--bg-secondary)', borderRadius: 10, border: field.highlight ? '1px solid rgba(59,130,246,0.2)' : '1px solid var(--surface-border)' }}>
+                        <span style={{ 
+                          fontSize: '0.72rem', fontWeight: 700, 
+                          color: field.highlight ? '#3b82f6' : 'var(--text-muted)', 
+                          textTransform: 'uppercase', letterSpacing: '0.04em', display: 'inline-block', marginBottom: 4,
+                          background: field.highlight ? '#3b82f6' : 'transparent',
+                          color: field.highlight ? 'white' : 'var(--text-muted)',
+                          padding: field.highlight ? '2px 6px' : '0',
+                          borderRadius: field.highlight ? '4px' : '0',
+                        }}>{field.label}</span>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text)', fontFamily: field.mono ? 'monospace' : 'inherit', wordBreak: 'break-all', marginTop: field.highlight ? 4 : 0 }}>{field.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Documents Section */}
+                  {digilockerDetail.documents?.items && digilockerDetail.documents.items.length > 0 && (
+                    <>
+                      <h4 style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>Issued Documents ({digilockerDetail.documents.items.length})</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
+                        {digilockerDetail.documents.items.map((doc, i) => (
+                          <div key={i} style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text)' }}>{doc.name}</span>
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: 10 }}>{doc.issuer}</span>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderRadius: 8 }}>{doc.doctype}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {/* ICJS Profile */}
+                  {digilockerDetail.icjs && (
+                    <>
+                      <h4 style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>ICJS Profile</h4>
+                      <div style={{ padding: '12px 16px', background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--surface-border)', marginBottom: 28 }}>
+                        <pre style={{ fontSize: '0.75rem', color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace', margin: 0, maxHeight: 200, overflowY: 'auto' }}>
+                          {typeof digilockerDetail.icjs === 'string' ? digilockerDetail.icjs : JSON.stringify(digilockerDetail.icjs, null, 2)}
+                        </pre>
+                      </div>
+                    </>
+                  )}
+
+                  {/* APAAR Details */}
+                  {digilockerDetail.apaar && (
+                    <>
+                      <h4 style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>APAAR Academic Record</h4>
+                      <div style={{ padding: '12px 16px', background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--surface-border)', marginBottom: 20 }}>
+                        <pre style={{ fontSize: '0.75rem', color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace', margin: 0, maxHeight: 200, overflowY: 'auto' }}>
+                          {typeof digilockerDetail.apaar === 'string' ? digilockerDetail.apaar : JSON.stringify(digilockerDetail.apaar, null, 2)}
+                        </pre>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 50 }}>
+                  <ShieldX size={48} color="#9ca3af" style={{ marginBottom: 16 }} />
+                  <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text)', marginBottom: 8 }}>Not Verified</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                    {digilockerModal.name} has not completed DigiLocker verification yet.
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Keyframe animations for online status indicators */}
       <style>{`

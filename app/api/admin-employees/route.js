@@ -48,6 +48,24 @@ export async function GET() {
   // No ID renumbering occurs here.
 
   const sanitized = uniqueUsers.map(({ password, _id, ...u }) => u);
+  
+  // Enrich with DigiLocker verification status
+  try {
+    const verifications = await db.collection('digilocker_verifications').find({}).toArray();
+    const verifyMap = {};
+    for (const v of verifications) {
+      verifyMap[v.userId] = { verified: v.verified, verifiedAt: v.verifiedAt };
+    }
+    for (const emp of sanitized) {
+      if (verifyMap[emp.id]) {
+        emp.digilockerVerified = verifyMap[emp.id].verified;
+        emp.digilockerVerifiedAt = verifyMap[emp.id].verifiedAt;
+      }
+    }
+  } catch (e) {
+    // Non-fatal — digilocker collection might not exist yet
+  }
+
   return NextResponse.json({ employees: sanitized });
 }
 
