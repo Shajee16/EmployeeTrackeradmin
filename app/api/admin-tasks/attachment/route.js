@@ -11,8 +11,15 @@ export async function GET(req) {
   const taskId = searchParams.get('taskId');
   if (!taskId) return NextResponse.json({ error: 'taskId required' }, { status: 400 });
 
+  const type = searchParams.get('type') || null;
   const db = await getDb();
-  const attachment = await db.collection('task_attachments').findOne({ taskId });
+  const query = { taskId };
+  if (type) {
+    query.type = type;
+  } else {
+    query.type = { $ne: 'completion_proof' };
+  }
+  const attachment = await db.collection('task_attachments').findOne(query);
 
   if (!attachment) {
     return NextResponse.json({ error: 'Attachment not found or expired (attachments are deleted after 25 days)' }, { status: 404 });

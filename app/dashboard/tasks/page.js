@@ -12,6 +12,7 @@ export default function TaskManagement() {
   const [form, setForm] = useState({ userId: '', title: '', description: '', priority: 'Medium', deadline: '' });
   const [attachment, setAttachment] = useState(null); // { filename, contentType, data }
   const [commentModal, setCommentModal] = useState(null);
+  const [viewModal, setViewModal] = useState(null);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // task to delete
@@ -130,6 +131,54 @@ export default function TaskManagement() {
       document.body.removeChild(link);
     } catch {
       alert('Failed to download attachment');
+    }
+  };
+
+  const downloadCompletionProof = async (taskId, filename) => {
+    try {
+      const res = await fetch(`/api/admin-tasks/attachment?taskId=${taskId}&type=completion_proof`);
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Completion proof not found');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = `data:${data.contentType};base64,${data.base64Data}`;
+      link.download = data.filename || filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      alert('Failed to download completion proof');
+    }
+  };
+
+  const addCommentFromViewModal = async () => {
+    if (!comment.trim() || !viewModal) return;
+    const res = await fetch('/api/admin-tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: viewModal.id, adminComment: comment }) });
+    if (res.ok) {
+      const updatedText = comment;
+      setViewModal(prev => {
+        if (!prev) return null;
+        const newComments = [...(prev.comments || []), {
+          id: Math.random().toString(),
+          text: updatedText,
+          timestamp: new Date().toISOString(),
+          by: 'admin'
+        }];
+        return { ...prev, comments: newComments };
+      });
+      setComment('');
+      load();
+    }
+  };
+
+  const updateStatusFromViewModal = async (status) => {
+    if (!viewModal) return;
+    const res = await fetch('/api/admin-tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: viewModal.id, status }) });
+    if (res.ok) {
+      setViewModal(prev => prev ? { ...prev, status } : null);
+      load();
     }
   };
 
@@ -271,13 +320,26 @@ export default function TaskManagement() {
           </thead>
           <tbody>
             {filtered.map((t, idx) => (
-              <tr key={`${t.id}-${idx}`}>
+              <tr key={`${t.id}-${idx}`} style={{ cursor: 'pointer' }} onClick={() => setViewModal(t)}>
                 <td>
-                  <div style={{ fontWeight: 600 }}>{t.title}</div>
+                  <div 
+                    onClick={(e) => { e.stopPropagation(); setViewModal(t); }}
+                    style={{ 
+                      fontWeight: 600, 
+                      color: 'var(--primary)',
+                      cursor: 'pointer',
+                      display: 'inline-block',
+                      transition: 'color 0.2s, text-decoration 0.2s'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
+                    onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
+                  >
+                    {t.title}
+                  </div>
                   {t.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{t.description.substring(0, 60)}{t.description.length > 60 ? '...' : ''}</div>}
                   {t.hasAttachment && (
                     <button
-                      onClick={() => downloadAttachment(t.id, t.attachmentName)}
+                      onClick={(e) => { e.stopPropagation(); downloadAttachment(t.id, t.attachmentName); }}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4,
                         background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
@@ -295,7 +357,7 @@ export default function TaskManagement() {
                 </td>
                 <td><span className={`badge ${priorityColor(t.priority)}`}>{t.priority}</span></td>
                 <td>
-                  <select value={t.status} onChange={e => updateStatus(t.id, e.target.value)}
+                  <select value={t.status} onClick={e => e.stopPropagation()} onChange={e => updateStatus(t.id, e.target.value)}
                     style={{ padding: '4px 8px', fontSize: '0.8rem', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)' }}>
                     <option value="Pending">Pending</option>
                     <option value="In Progress">In Progress</option>
@@ -304,7 +366,7 @@ export default function TaskManagement() {
                 </td>
                 <td style={{ fontSize: '0.85rem' }}>{t.deadline ? new Date(t.deadline).toLocaleDateString() : '-'}</td>
                 <td>
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                     <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setCommentModal(t)} title="Comment">
                       <MessageSquare size={14} /> {(t.comments?.length || 0)}
                     </button>
@@ -321,6 +383,107 @@ export default function TaskManagement() {
           </tbody>
         </table>
       </div>
+
+      {/* Task View/Detail Modal */}
+      {viewModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }} onClick={() => setViewModal(null)}>
+          <div className="card" style={{ width: '100%', maxWidth: 700, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--bg-secondary)' }}>
+              <div>
+                <span className={`badge ${priorityColor(viewModal.priority)}`} style={{ marginBottom: 6 }}>{viewModal.priority}</span>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>{viewModal.title}</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Assigned to: <strong>{viewModal.employeeName}</strong> ({viewModal.employeeDept})
+                </p>
+              </div>
+              <button onClick={() => setViewModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
+            </div>
+            
+            {/* Scrollable Content */}
+            <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Task Meta Stats Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
+                <div style={{ padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Status</div>
+                  <select value={viewModal.status} onChange={e => updateStatusFromViewModal(e.target.value)}
+                    style={{ fontSize: '0.8rem', fontWeight: 600, width: '100%', border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)', padding: '4px 6px', borderRadius: 6 }}>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+                <div style={{ padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Deadline</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{viewModal.deadline ? new Date(viewModal.deadline).toLocaleDateString() : '-'}</div>
+                </div>
+                <div style={{ padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Created At</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{viewModal.createdAt ? new Date(viewModal.createdAt).toLocaleDateString() : '-'}</div>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 8, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</h4>
+                <div style={{ background: 'var(--bg-secondary)', padding: 16, borderRadius: 10, border: '1px solid var(--surface-border)', fontSize: '0.9rem', color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                  {viewModal.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No description provided.</span>}
+                </div>
+              </div>
+
+              {/* Attachments */}
+              {(viewModal.hasAttachment || viewModal.hasCompletionProof) && (
+                <div>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 8, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attachments</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {viewModal.hasAttachment && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 8 }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text)' }}>Task Document: {viewModal.attachmentName || 'Attachment'}</span>
+                        <button onClick={() => downloadAttachment(viewModal.id, viewModal.attachmentName)} className="btn btn-sm btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', padding: '4px 10px' }}>
+                          <Download size={12} /> Download
+                        </button>
+                      </div>
+                    )}
+                    {viewModal.hasCompletionProof && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: 8 }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text)' }}>Completion Proof: {viewModal.completionProofName || 'Proof.pdf'}</span>
+                        <button onClick={() => downloadCompletionProof(viewModal.id, viewModal.completionProofName || 'Proof')} className="btn btn-sm btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', padding: '4px 10px', background: '#10b981', border: 'none' }}>
+                          <Download size={12} /> Download Proof
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Comments Section */}
+              <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Comments & Discussion</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14, maxHeight: 180, overflowY: 'auto', paddingRight: 4 }}>
+                  {(viewModal.comments || []).map(c => (
+                    <div key={c.id} style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: c.by === 'admin' ? 'var(--primary)' : 'var(--text)' }}>
+                          {c.by === 'admin' ? 'Admin' : 'Employee'}
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{new Date(c.timestamp).toLocaleString()}</span>
+                      </div>
+                      <p style={{ fontSize: '0.82rem', margin: 0, color: 'var(--text)', lineHeight: 1.4 }}>{c.text}</p>
+                    </div>
+                  ))}
+                  {(!viewModal.comments || viewModal.comments.length === 0) && (
+                    <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0', fontSize: '0.82rem' }}>No comments logged yet.</p>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input placeholder="Add a comment to this task..." value={comment} onChange={e => setComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCommentFromViewModal()} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--bg)', color: 'var(--text)' }} />
+                  <button className="btn btn-primary" onClick={addCommentFromViewModal} style={{ padding: '10px 20px', fontWeight: 600 }}>Send</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Comment Modal */}
       {commentModal && (

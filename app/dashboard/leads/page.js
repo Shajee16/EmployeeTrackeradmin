@@ -1,9 +1,12 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Target, Search, Phone, Mail, DollarSign, Users, TrendingUp, ChevronDown, ChevronRight, MessageSquare, Send, RefreshCw, Trash2, UserPlus, AlertTriangle, CheckCircle, XCircle, Save, Edit3, MessageCircle } from 'lucide-react';
 
 export default function LeadManagement() {
+  const searchParams = useSearchParams();
+  const expandId = searchParams ? searchParams.get('expand') : null;
   const [leads, setLeads] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [emails, setEmails] = useState([]);
@@ -65,6 +68,19 @@ export default function LeadManagement() {
     const poll = setInterval(loadData, 45000);
     return () => clearInterval(poll);
   }, []);
+
+  useEffect(() => {
+    if (expandId && leads.length > 0) {
+      const lead = leads.find(l => l.id === expandId);
+      if (lead) {
+        const dept = lead.assignedDepartment || 'Unassigned';
+        const emp = lead.assignedAsset || 'Unassigned';
+        setExpandedDepts(prev => ({ ...prev, [dept]: true }));
+        setExpandedEmps(prev => ({ ...prev, [`${dept}-${emp}`]: true }));
+        openDetailModal(lead);
+      }
+    }
+  }, [expandId, leads]);
 
   const updateStatus = async (id, status) => {
     await fetch('/api/admin-leads', {

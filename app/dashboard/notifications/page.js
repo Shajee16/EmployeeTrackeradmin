@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bell, CheckCheck, RefreshCw, Info, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
 const TYPE_CONFIG = {
@@ -10,6 +11,7 @@ const TYPE_CONFIG = {
 };
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -87,8 +89,12 @@ export default function NotificationsPage() {
               const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.info;
               const Icon = cfg.icon;
               return (
-                <div key={n.id} onClick={() => !n.read && markRead(n.id)}
-                  style={{ padding: '14px 16px', borderRadius: 12, border: `1px solid ${n.read ? 'var(--surface-border)' : cfg.border}`, background: n.read ? 'var(--bg-secondary)' : cfg.bg, cursor: n.read ? 'default' : 'pointer', display: 'flex', gap: 14, alignItems: 'flex-start', transition: 'all 0.2s', opacity: n.read ? 0.7 : 1 }}>
+                <div key={n.id} 
+                  onClick={() => {
+                    if (!n.read) markRead(n.id);
+                    if (n.link) router.push(n.link);
+                  }}
+                  style={{ padding: '14px 16px', borderRadius: 12, border: `1px solid ${n.read ? 'var(--surface-border)' : cfg.border}`, background: n.read ? 'var(--bg-secondary)' : cfg.bg, cursor: 'pointer', display: 'flex', gap: 14, alignItems: 'flex-start', transition: 'all 0.2s', opacity: n.read ? 0.7 : 1 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon size={18} color={cfg.color} />
                   </div>
