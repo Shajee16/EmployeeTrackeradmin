@@ -44,3 +44,32 @@ export async function GET(req) {
 
   return NextResponse.json({ verifications: verificationMap });
 }
+
+// DELETE — Unlink/delete DigiLocker verification details for a user (Super Admin only)
+export async function DELETE(req) {
+  const auth = await requireAdmin();
+  if (auth.error) return auth.response;
+  
+  if (auth.session.role !== 'Super Admin') {
+    return NextResponse.json({ error: 'Forbidden: Super Admin access required' }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const employeeId = searchParams.get('employeeId');
+  if (!employeeId) {
+    return NextResponse.json({ error: 'Missing employeeId parameter' }, { status: 400 });
+  }
+
+  const db = await getDb();
+  
+  // Remove digilocker verification record
+  await db.collection('digilocker_verifications').deleteOne({ userId: employeeId });
+  
+  // Unset verified flags in the users collection
+  await db.collection('users').updateOne(
+    { id: employeeId },
+    { $unset: { digilockerVerified: '', digilockerVerifiedAt: '' } }
+  );
+
+  return NextResponse.json({ success: true, message: `DigiLocker unlinked successfully for employee ${employeeId}` });
+}

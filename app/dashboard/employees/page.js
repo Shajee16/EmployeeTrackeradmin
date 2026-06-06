@@ -1,9 +1,32 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Target, ShieldCheck, ShieldX } from 'lucide-react';
+import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Target, ShieldCheck, ShieldX, Link2Off } from 'lucide-react';
+import { useTheme } from '../layout';
+
+const formatDob = (dob) => {
+  if (!dob) return '';
+  const dobStr = dob.toString().trim();
+  // Check if DDMMYYYY
+  if (/^\d{8}$/.test(dobStr)) {
+    return `${dobStr.substring(0, 2)}-${dobStr.substring(2, 4)}-${dobStr.substring(4, 8)}`;
+  }
+  // Check if YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dobStr)) {
+    const parts = dobStr.split('-');
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dobStr;
+};
+
+const getMaskedValue = (value) => {
+  if (!value) return '';
+  const str = value.toString().trim();
+  return '•'.repeat(Math.min(15, str.length));
+};
 
 export default function EmployeesPage() {
+  const { user } = useTheme();
   const [employees, setEmployees] = useState([]);
   const [savedDepartments, setSavedDepartments] = useState([]);
   const [showDeptModal, setShowDeptModal] = useState(false);
@@ -44,6 +67,11 @@ export default function EmployeesPage() {
   const [digilockerModal, setDigilockerModal] = useState(null);
   const [digilockerDetail, setDigilockerDetail] = useState(null);
   const [loadingDigilocker, setLoadingDigilocker] = useState(false);
+  const [visibleFields, setVisibleFields] = useState({});
+
+  const toggleFieldVisibility = (label) => {
+    setVisibleFields(prev => ({ ...prev, [label]: !prev[label] }));
+  };
 
   const load = () => {
     fetch('/api/admin-employees').then(r => r.json()).then(d => setEmployees(d.employees || []));
@@ -162,6 +190,7 @@ export default function EmployeesPage() {
   };
 
   const viewDigilocker = async (emp) => {
+    setVisibleFields({});
     setDigilockerModal(emp);
     setDigilockerDetail(null);
     setLoadingDigilocker(true);
@@ -173,6 +202,30 @@ export default function EmployeesPage() {
       setDigilockerDetail({ verified: false });
     }
     setLoadingDigilocker(false);
+  };
+
+  const unlinkDigilocker = async (employeeId, name) => {
+    if (!confirm(`Are you sure you want to unlink DigiLocker verification for ${name}? This will require them to re-verify.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin-digilocker?employeeId=${employeeId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showMsg(`DigiLocker unlinked for ${name}`);
+        // Refresh digilocker verification map
+        fetch('/api/admin-digilocker')
+          .then(r => r.json())
+          .then(d => setDigilockerMap(d.verifications || {}))
+          .catch(() => {});
+      } else {
+        showMsg(data.error || 'Failed to unlink DigiLocker', true);
+      }
+    } catch (err) {
+      showMsg('An error occurred while unlinking DigiLocker', true);
+    }
   };
 
   const toggleDept = (dept) => {
@@ -399,6 +452,16 @@ export default function EmployeesPage() {
                                 <button className="btn btn-outline" style={{ padding: '6px 12px', color: e.hideFromLeaderboard ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => toggleLeaderboard(e.id, !e.hideFromLeaderboard)} title={e.hideFromLeaderboard ? "Show on Leaderboard" : "Hide from Leaderboard"}>
                                   {e.hideFromLeaderboard ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
+                                 {user?.role === 'Super Admin' && digilockerMap[e.id]?.verified && (
+                                  <button 
+                                    className="btn btn-outline" 
+                                    style={{ padding: '6px 12px', color: '#dc2626', borderColor: 'rgba(220, 38, 38, 0.25)' }} 
+                                    onClick={() => unlinkDigilocker(e.id, e.name)}
+                                    title="Unlink DigiLocker Verification"
+                                  >
+                                    <Link2Off size={16} />
+                                  </button>
+                                )}
                                 <button className="btn btn-danger" style={{ padding: '6px 12px' }} onClick={() => confirmDelete(e.id, e.name)}>
                                   <UserX size={16} />
                                 </button>
@@ -962,30 +1025,66 @@ export default function EmployeesPage() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 28 }}>
                     {[
-                      { label: 'DigiLocker Username', value: digilockerDetail.username, highlight: true },
+                      { label: 'DigiLocker Username', value: digilockerDetail.username, highlight: true, span2: true, maskable: true },
                       { label: 'Full Name', value: digilockerDetail.name },
                       { label: 'Age', value: digilockerDetail.age },
-                      { label: 'Date of Birth', value: digilockerDetail.dob },
+                      { label: 'Date of Birth', value: formatDob(digilockerDetail.dob), maskable: true },
                       { label: 'Gender', value: digilockerDetail.gender === 'M' ? 'Male' : digilockerDetail.gender === 'F' ? 'Female' : digilockerDetail.gender },
                       { label: 'Aadhaar', value: digilockerDetail.aadhaar, mono: true },
-                      { label: 'PAN', value: digilockerDetail.pan, mono: true, highlight: true },
-                      { label: 'Driving Licence', value: digilockerDetail.dl_no, mono: true, highlight: true },
-                      { label: 'Mobile', value: digilockerDetail.mobile },
-                      { label: 'Email', value: digilockerDetail.email },
-                      { label: 'DigiLocker ID', value: digilockerDetail.digilockerid, mono: true, highlight: true },
-                      { label: 'Reference Key', value: digilockerDetail.reference_key, mono: true, highlight: true },
+                      { label: 'PAN', value: digilockerDetail.pan, mono: true, highlight: true, maskable: true },
+                      { label: 'Driving Licence', value: digilockerDetail.dl_no, mono: true, highlight: true, maskable: true },
+                      { label: 'Mobile', value: digilockerDetail.mobile, maskable: true },
+                      { label: 'Email', value: digilockerDetail.email, span2: true, maskable: true },
+                      { label: 'DigiLocker ID', value: digilockerDetail.digilockerid, mono: true, highlight: true, span2: true, maskable: true },
+                      { label: 'Reference Key', value: digilockerDetail.reference_key, mono: true, highlight: true, span2: true, maskable: true },
                     ].filter(f => f.value).map(field => (
-                      <div key={field.label} style={{ padding: '12px 14px', background: field.highlight ? 'rgba(59,130,246,0.05)' : 'var(--bg-secondary)', borderRadius: 10, border: field.highlight ? '1px solid rgba(59,130,246,0.2)' : '1px solid var(--surface-border)' }}>
-                        <span style={{ 
-                          fontSize: '0.72rem', fontWeight: 700, 
-                          color: field.highlight ? '#3b82f6' : 'var(--text-muted)', 
-                          textTransform: 'uppercase', letterSpacing: '0.04em', display: 'inline-block', marginBottom: 4,
-                          background: field.highlight ? '#3b82f6' : 'transparent',
-                          color: field.highlight ? 'white' : 'var(--text-muted)',
-                          padding: field.highlight ? '2px 6px' : '0',
-                          borderRadius: field.highlight ? '4px' : '0',
-                        }}>{field.label}</span>
-                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text)', fontFamily: field.mono ? 'monospace' : 'inherit', wordBreak: 'break-all', marginTop: field.highlight ? 4 : 0 }}>{field.value}</div>
+                      <div key={field.label} style={{ 
+                        padding: '12px 14px', 
+                        background: field.highlight ? 'rgba(59,130,246,0.05)' : 'var(--bg-secondary)', 
+                        borderRadius: 10, 
+                        border: field.highlight ? '1px solid rgba(59,130,246,0.2)' : '1px solid var(--surface-border)',
+                        gridColumn: field.span2 ? 'span 2' : 'span 1',
+                        position: 'relative'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{ 
+                            fontSize: '0.72rem', fontWeight: 700, 
+                            textTransform: 'uppercase', letterSpacing: '0.04em',
+                            background: field.highlight ? '#3b82f6' : 'transparent',
+                            color: field.highlight ? 'white' : 'var(--text-muted)',
+                            padding: field.highlight ? '2px 6px' : '0',
+                            borderRadius: field.highlight ? '4px' : '0',
+                          }}>{field.label}</span>
+                          {field.maskable && (
+                            <button 
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                toggleFieldVisibility(field.label);
+                              }}
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+                                padding: '2px', borderRadius: '4px',
+                                transition: 'color 0.2s',
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
+                              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                              title={visibleFields[field.label] ? "Hide field value" : "Show field value"}
+                            >
+                              {visibleFields[field.label] ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ 
+                          fontSize: '0.92rem', 
+                          fontWeight: 600, 
+                          color: 'var(--text)', 
+                          fontFamily: field.mono ? 'monospace' : 'inherit', 
+                          wordBreak: 'break-word',
+                          marginTop: (field.highlight && !field.maskable) ? 4 : 0
+                        }}>
+                          {field.maskable && !visibleFields[field.label] ? getMaskedValue(field.value) : field.value}
+                        </div>
                       </div>
                     ))}
                   </div>
