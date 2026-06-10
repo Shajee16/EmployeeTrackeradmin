@@ -220,7 +220,9 @@ export async function PUT(req) {
   if (body.phone !== undefined) updateFields.phone = sanitizeString(body.phone, 20);
   if (body.dob !== undefined) updateFields.dob = sanitizeString(body.dob, 20);
   if (body.newPassword) {
-    updateFields.password = await bcrypt.hash(sanitizeString(body.newPassword, 128), 10);
+    const hashedPass = await bcrypt.hash(sanitizeString(body.newPassword, 128), 10);
+    updateFields.password = hashedPass;
+    updateFields.passwordHash = hashedPass;
   }
 
   if (Object.keys(updateFields).length > 0) {
