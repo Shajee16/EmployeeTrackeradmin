@@ -277,7 +277,7 @@ export async function POST(req, { params }) {
           </p>
 
           <div style="text-align: center; margin: 28px 0;">
-            <a href="https://www.crm.cluso.in" target="_blank" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">
+            <a href="https://crm.cluso.in/" target="_blank" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">
               Go to Employee Portal
             </a>
           </div>
