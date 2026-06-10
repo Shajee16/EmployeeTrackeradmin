@@ -24,7 +24,20 @@ export async function GET() {
 
   const db = await getDb();
   const usersCol = db.collection('users');
-  const users = await usersCol.find({ role: { $ne: 'candidate' } }).toArray();
+  // Exclude candidates: role must not be 'candidate', AND the user must have
+  // an employee ID (the 'id' field like CLSAL001). Self-registered candidates
+  // who haven't been onboarded yet should never appear in the employees list.
+  const users = await usersCol.find({
+    $and: [
+      { role: { $ne: 'candidate' } },
+      { id: { $exists: true, $nin: [null, ''] } },
+      // Either not self-registered, or self-registered AND already onboarded
+      { $or: [
+        { selfRegistered: { $ne: true } },
+        { selfRegistered: true, onboarded: true },
+      ]},
+    ],
+  }).toArray();
 
   // Deduplicate by email
   const uniqueUsers = [];
