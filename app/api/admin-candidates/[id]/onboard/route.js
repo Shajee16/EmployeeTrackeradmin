@@ -53,12 +53,12 @@ export async function POST(req, { params }) {
 
   try {
     const db = await getDb();
-    const candidatesCollection = db.collection('candidates');
     const usersCollection = db.collection('users');
 
-    // Find the candidate in the candidates collection
-    const candidate = await candidatesCollection.findOne({
+    // Find the candidate in the users collection
+    const candidate = await usersCollection.findOne({
       _id: new ObjectId(id),
+      role: 'candidate',
       onboarded: { $ne: true },
     });
 
@@ -72,6 +72,8 @@ export async function POST(req, { params }) {
     // Check if an employee with this email already exists in users collection
     const existingEmployee = await usersCollection.findOne({
       email: candidate.email,
+      _id: { $ne: candidate._id },
+      role: { $ne: 'candidate' },
     });
 
     if (existingEmployee) {
@@ -129,13 +131,14 @@ export async function POST(req, { params }) {
     const isDigiVerified = !!(candidate.digilockerProfile && candidate.digilockerProfile.verified);
     const digiVerifiedAt = isDigiVerified ? (candidate.digilockerProfile.linkedAt || new Date().toISOString()) : null;
 
-    // Create the employee in the users collection
+    // Create the employee fields to update/set on the user record
     const newEmployee = {
       id: customId,
       name: candidate.name,
       email: candidate.email,
       phone: candidate.phone || (candidate.digilockerProfile?.mobile) || '',
       password: employeePasswordHash,
+      passwordHash: employeePasswordHash, // keep both fields in sync
       role: (position || '').trim() || 'Employee',
       department: department.trim(),
       designation: (designation || '').trim() || '',
@@ -149,9 +152,17 @@ export async function POST(req, { params }) {
       digilockerProfile: candidate.digilockerProfile || null,
       digilockerVerified: isDigiVerified,
       digilockerVerifiedAt: digiVerifiedAt,
+      // Mark candidate as onboarded on their user record
+      onboarded: true,
+      onboardedAt: new Date(),
+      onboardedBy: session?.name || session?.email || 'Admin',
+      onboardedEmployeeId: customId,
     };
 
-    await usersCollection.insertOne(newEmployee);
+    await usersCollection.updateOne(
+      { _id: candidate._id },
+      { $set: newEmployee }
+    );
 
     // If candidate has DigiLocker verification, also copy it to the digilocker_verifications collection
     if (isDigiVerified) {
@@ -215,19 +226,6 @@ export async function POST(req, { params }) {
         { upsert: true }
       );
     }
-
-    // Mark the candidate as onboarded (keep for audit trail)
-    await candidatesCollection.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          onboarded: true,
-          onboardedAt: new Date(),
-          onboardedBy: session?.name || session?.email || 'Admin',
-          onboardedEmployeeId: newEmployee.id,
-        },
-      }
-    );
 
     // Send a professional welcome email to the newly onboarded employee
     const subject = `Welcome to the Team, ${candidate.name}! Your Onboarding is Complete`;

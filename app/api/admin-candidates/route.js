@@ -21,8 +21,8 @@ export async function GET() {
   try {
     const db = await getDb();
     const candidates = await db
-      .collection('candidates')
-      .find({ onboarded: { $ne: true } })
+      .collection('users')
+      .find({ role: 'candidate', onboarded: { $ne: true } })
       .sort({ createdAt: -1 })
       .project({
         _id: 1,

@@ -24,7 +24,7 @@ export async function GET() {
 
   const db = await getDb();
   const usersCol = db.collection('users');
-  const users = await usersCol.find({}).toArray();
+  const users = await usersCol.find({ role: { $ne: 'candidate' } }).toArray();
 
   // Deduplicate by email
   const uniqueUsers = [];
