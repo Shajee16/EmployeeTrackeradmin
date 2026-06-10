@@ -550,36 +550,58 @@ export default function CandidateRosterPage() {
                     : 'N/A'}
                 </div>
 
-                {/* Onboard Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOnboardModal(candidate);
-                    setOnboardDept('');
-                    setOnboardPosition('');
-                    setOnboardDesignation('');
-                    setOnboardError('');
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <UserCheck size={15} />
-                  Onboard
-                </button>
+                {/* Onboard Button / Status */}
+                {candidate.onboarded ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.45rem 0.9rem',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
+                      border: '1px solid #a7f3d0',
+                      color: '#065f46',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={candidate.onboardedAt ? `Onboarded on ${new Date(candidate.onboardedAt).toLocaleDateString()}` : "Onboarded"}
+                  >
+                    <UserCheck size={14} style={{ color: '#059669' }} />
+                    Onboarded {candidate.onboardedEmployeeId ? `(${candidate.onboardedEmployeeId})` : ''}
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOnboardModal(candidate);
+                      setOnboardDept('');
+                      setOnboardPosition('');
+                      setOnboardDesignation('');
+                      setOnboardError('');
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <UserCheck size={15} />
+                    Onboard
+                  </button>
+                )}
 
                 {/* Expand Arrow */}
                 {isExpanded ? (

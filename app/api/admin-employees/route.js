@@ -204,6 +204,8 @@ export async function PUT(req) {
 
   if (body.action === 'toggle_status') {
     updateFields.status = user.status === 'away' ? 'active' : 'away';
+  } else if (body.action === 'toggle_deactivation') {
+    updateFields.deactivated = !user.deactivated;
   } else if (body.action === 'toggle_leaderboard') {
     updateFields.hideFromLeaderboard = body.hideFromLeaderboard;
   }
@@ -211,6 +213,7 @@ export async function PUT(req) {
   // Support editing other fields with sanitization
   // NOTE: Employee ID is NEVER updated — it is permanent and immutable
   if (body.name !== undefined) updateFields.name = sanitizeString(body.name, 100);
+  if (body.deactivated !== undefined) updateFields.deactivated = Boolean(body.deactivated);
   if (body.department !== undefined) updateFields.department = sanitizeString(body.department, 50);
   if (body.role !== undefined) updateFields.role = sanitizeString(body.role, 50);
   if (body.designation !== undefined) updateFields.designation = sanitizeString(body.designation, 100);

@@ -22,17 +22,26 @@ export async function GET() {
     const db = await getDb();
     const candidates = await db
       .collection('users')
-      .find({ role: 'candidate', onboarded: { $ne: true } })
+      .find({
+        $or: [
+          { role: 'candidate' },
+          { onboardedFromCandidate: true }
+        ]
+      })
       .sort({ createdAt: -1 })
       .project({
         _id: 1,
         name: 1,
         email: 1,
         phone: 1,
+        role: 1,
         candidateProfile: 1,
         digilockerProfile: 1,
         selfRegistered: 1,
         mustChangePassword: 1,
+        onboarded: 1,
+        onboardedEmployeeId: 1,
+        onboardedAt: 1,
         createdAt: 1,
       })
       .toArray();

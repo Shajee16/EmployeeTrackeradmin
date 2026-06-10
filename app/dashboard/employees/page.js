@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Target, ShieldCheck, ShieldX, Link2Off } from 'lucide-react';
+import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Target, ShieldCheck, ShieldX, Link2Off, Lock, Unlock } from 'lucide-react';
 import { useTheme } from '../layout';
 
 const formatDob = (dob) => {
@@ -154,6 +154,24 @@ export default function EmployeesPage() {
   const toggleLeaderboard = async (id, hide) => {
     await fetch('/api/admin-employees', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'toggle_leaderboard', hideFromLeaderboard: hide }) });
     showMsg(hide ? 'Hidden from leaderboard' : 'Visible on leaderboard'); load();
+  };
+
+  const toggleDeactivation = async (id, currentDeactivated, name) => {
+    const actionText = currentDeactivated ? 'activate' : 'deactivate';
+    if (!confirm(`Are you sure you want to ${actionText} ${name}?`)) {
+      return;
+    }
+    const res = await fetch('/api/admin-employees', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action: 'toggle_deactivation' })
+    });
+    if (res.ok) {
+      showMsg(`${name} has been ${currentDeactivated ? 'activated' : 'deactivated'}`);
+      load();
+    } else {
+      showMsg('Failed to update employee status', true);
+    }
   };
 
   const confirmDelete = (id, name) => {
@@ -354,7 +372,7 @@ export default function EmployeesPage() {
                           const isOnline = !!onlineMap[e.id];
                           const onlineInfo = onlineMap[e.id];
                           return (
-                          <tr key={e.id} style={{ borderBottom: '1px solid var(--surface-border)', opacity: e.status === 'away' ? 0.6 : 1 }}>
+                          <tr key={e.id} style={{ borderBottom: '1px solid var(--surface-border)', opacity: e.deactivated ? 0.45 : (e.status === 'away' ? 0.6 : 1) }}>
                             <td style={{ padding: '16px 20px', verticalAlign: 'middle' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 {/* Online indicator dot */}
@@ -418,7 +436,11 @@ export default function EmployeesPage() {
                             <td style={{ padding: '16px 20px', color: 'var(--text-muted)', verticalAlign: 'middle' }}>{e.designation || e.role}</td>
                             <td style={{ padding: '16px 20px', verticalAlign: 'middle' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <span className={`badge ${e.status === 'away' ? 'badge-warning' : 'badge-success'}`}>{e.status === 'away' ? 'Away' : 'Active'}</span>
+                                {e.deactivated ? (
+                                  <span className="badge badge-danger" style={{ background: '#ef4444', color: '#fff', width: 'fit-content' }}>Deactivated</span>
+                                ) : (
+                                  <span className={`badge ${e.status === 'away' ? 'badge-warning' : 'badge-success'}`}>{e.status === 'away' ? 'Away' : 'Active'}</span>
+                                )}
                                 <span style={{
                                   display: 'inline-flex', alignItems: 'center', gap: 5,
                                   padding: '3px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700,
@@ -451,6 +473,14 @@ export default function EmployeesPage() {
                                 </button>
                                 <button className="btn btn-outline" style={{ padding: '6px 12px', color: e.hideFromLeaderboard ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => toggleLeaderboard(e.id, !e.hideFromLeaderboard)} title={e.hideFromLeaderboard ? "Show on Leaderboard" : "Hide from Leaderboard"}>
                                   {e.hideFromLeaderboard ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                                <button 
+                                  className="btn btn-outline" 
+                                  style={{ padding: '6px 12px', color: e.deactivated ? '#10b981' : '#ef4444', borderColor: e.deactivated ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)' }} 
+                                  onClick={() => toggleDeactivation(e.id, e.deactivated, e.name)} 
+                                  title={e.deactivated ? "Activate Employee" : "Deactivate Employee"}
+                                >
+                                  {e.deactivated ? <Unlock size={16} /> : <Lock size={16} />}
                                 </button>
                                  {user?.role === 'Super Admin' && (
                                    digilockerMap[e.id]?.verified ? (
@@ -793,6 +823,13 @@ export default function EmployeesPage() {
                   <select value={editForm.status || 'active'} onChange={e => setEditForm({...editForm, status: e.target.value})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }}>
                     <option value="active">Active</option>
                     <option value="away">Away</option>
+                  </select>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>Account Deactivation</label>
+                  <select value={editForm.deactivated ? 'deactivated' : 'active'} onChange={e => setEditForm({...editForm, deactivated: e.target.value === 'deactivated'})} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface)', color: 'var(--text)' }}>
+                    <option value="active">Active / Enabled</option>
+                    <option value="deactivated">Deactivated / Disabled</option>
                   </select>
                 </div>
                 <div style={{ marginBottom: 20 }}>
