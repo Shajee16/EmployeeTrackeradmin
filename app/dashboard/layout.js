@@ -12,6 +12,7 @@ export const useTheme = () => useContext(ThemeContext);
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', desc: 'Overview of all operations and key metrics' },
   { icon: Users, label: 'Employees', path: '/dashboard/employees', desc: 'Manage employee records and profiles' },
+  { icon: UserCheck, label: 'Candidate Roster', path: '/dashboard/candidates', desc: 'View self-registered candidates and onboard them as employees' },
   { icon: Layers, label: 'Departments', path: '/dashboard/departments', desc: 'Manage company departments and units' },
   // ── Department Groups (expandable) ──
   {

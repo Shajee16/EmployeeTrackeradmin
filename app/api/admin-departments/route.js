@@ -8,7 +8,7 @@ import { v4 as uuid } from 'uuid';
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  if (!['System Admin', 'Super Admin'].includes(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!['System Admin', 'Super Admin', 'HR', 'Admin'].includes(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   let departments = await readData('departments');
   if (departments.length === 0) {
