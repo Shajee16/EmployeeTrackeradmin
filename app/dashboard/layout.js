@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, createContext, useContext, Suspense, useRef } from 'react';
-import { ShieldAlert, ShieldCheck, AlertTriangle, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle, X, LogOut, Sun, Moon, ChevronRight, ChevronDown, ChevronsLeft, ChevronsRight, Type, Trophy, GraduationCap, Megaphone, DollarSign, UserCheck, BarChart3, Monitor, Minus, Plus } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, AlertTriangle, Users, Target, Activity, FileText, LayoutDashboard, Settings, Layers, Menu, Bell, Search, ClipboardList, CalendarCheck, MessageSquare, PlusCircle, X, LogOut, Sun, Moon, ChevronRight, ChevronDown, ChevronsLeft, ChevronsRight, Type, Trophy, GraduationCap, Megaphone, DollarSign, UserCheck, BarChart3, Monitor, Minus, Plus, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoImg from '../logo.png';
 
@@ -52,6 +52,7 @@ const navItems = [
   { icon: Bell, label: 'Notifications', path: '/dashboard/notifications', desc: 'View system notifications and updates' },
   { icon: ShieldCheck, label: 'Admin Management', path: '/dashboard/admin-management', superOnly: true, desc: 'Manage portal administrators and their roles' },
   { icon: Trophy, label: 'Leaderboard', path: '/dashboard/leaderboard', desc: 'View employee performance rankings' },
+  { icon: Award, label: 'Certificates', path: '/dashboard/certificates', desc: 'Create and share professional certificates' },
   { icon: Settings, label: 'Settings', path: '/dashboard/settings', desc: 'Configure portal settings and your profile' },
 ];
 
