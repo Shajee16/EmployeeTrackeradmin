@@ -15,6 +15,7 @@ const CERT_TYPES = [
   { key: 'completion', label: 'Certificate of Completion', icon: Check, color: '#10b981', desc: 'Certify successful completion of a program or tenure' },
   { key: 'appreciation', label: 'Certificate of Appreciation', icon: Heart, color: '#ec4899', desc: 'Express gratitude for dedicated service and efforts' },
   { key: 'achievement', label: 'Certificate of Achievement', icon: Trophy, color: '#8b5cf6', desc: 'Acknowledge a specific milestone or accomplishment' },
+  { key: 'relieving', label: 'Relieving Letter', icon: FileText, color: '#3b82f6', desc: 'Issue an official relieving letter for departing employees' },
 ];
 
 const COMPLETION_CATEGORIES = [
@@ -50,6 +51,10 @@ function generateCertBody({ type, category, recipientName, recipientDesignation,
 
   if (type === 'excellence') {
     return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at Cluso Infolink, has demonstrated exceptional performance, dedication, and outstanding contributions to the organization. ${name} has consistently exceeded expectations, shown remarkable initiative, and inspired excellence among peers.\n\nThe management extends its sincere appreciation for the exemplary work and unwavering commitment shown by ${name}. We recognize this achievement under the mentorship of <strong>${guide}</strong>.\n\nWe wish ${name} continued success and look forward to many more accomplishments.`;
+  }
+
+  if (type === 'relieving') {
+    return `This is to certify that <strong>${name}</strong> was employed at Cluso Infolink as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>. ${name} has resigned from the services of the company and is officially relieved from all duties and responsibilities with effect from the close of business hours on <strong>${toDate}</strong>.\n\nDuring their tenure with us, ${name} demonstrated professionalism, integrity, and a strong work ethic. They worked under the supervision of <strong>${guide}</strong> and were found to be ${qualities}.\n\nWe thank ${name} for their contributions and wish them the very best in all future professional endeavors.`;
   }
 
   if (type === 'completion') {
@@ -108,6 +113,7 @@ function getCertTitle(type, category) {
     completion: 'Certificate of Completion',
     appreciation: 'Certificate of Appreciation',
     achievement: 'Certificate of Achievement',
+    relieving: 'Relieving Letter',
   };
   return titles[type] || 'Certificate';
 }
@@ -121,6 +127,236 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
   const bodyHtml = body.replace(/\n/g, '<br/>');
   const fromDate = dateFrom ? formatDateDisplay(dateFrom) : '';
   const toDate = dateTo ? formatDateDisplay(dateTo) : '';
+
+  if (type === 'relieving') {
+    const formattedDate = toDate || formatDateDisplay(new Date());
+    const refId = recipientId ? `CI/HR/RL/${recipientId}` : `CI/HR/RL/${Math.floor(1000 + Math.random() * 9000)}`;
+
+    if (template === 'classic') {
+      return `
+        <div style="font-family: 'Georgia', 'Times New Roman', serif; width: 640px; height: 900px; margin: 0 auto; padding: 48px 56px; background: #fffdf7; border: 1px solid #d4b896; box-shadow: 0 4px 20px rgba(0,0,0,0.05); box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+          <!-- Ornamental corners -->
+          <div style="position: absolute; top: 12px; left: 12px; width: 16px; height: 16px; border-top: 2px solid #c29b76; border-left: 2px solid #c29b76;"></div>
+          <div style="position: absolute; top: 12px; right: 12px; width: 16px; height: 16px; border-top: 2px solid #c29b76; border-right: 2px solid #c29b76;"></div>
+          <div style="position: absolute; bottom: 12px; left: 12px; width: 16px; height: 16px; border-bottom: 2px solid #c29b76; border-left: 2px solid #c29b76;"></div>
+          <div style="position: absolute; bottom: 12px; right: 12px; width: 16px; height: 16px; border-bottom: 2px solid #c29b76; border-right: 2px solid #c29b76;"></div>
+
+          <div>
+            <!-- Header Letterhead -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
+              <img src="${LOGO_BASE64}" alt="Cluso Infolink Logo" style="height: 38px; width: auto; object-fit: contain;" />
+              <div style="text-align: right; font-size: 10px; color: #7c5e3f; line-height: 1.4; font-family: 'Georgia', serif; font-style: italic;">
+                <strong>Cluso Infolink</strong><br/>
+                Web: www.cluso.in | Email: hr@cluso.in
+              </div>
+            </div>
+            <div style="width: 100%; height: 2px; background: linear-gradient(90deg, #c29b76, transparent); margin-bottom: 24px;"></div>
+
+            <!-- Meta info -->
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #4a3c31; margin-bottom: 28px;">
+              <div><strong>Ref No:</strong> ${refId}</div>
+              <div><strong>Date:</strong> ${formattedDate}</div>
+            </div>
+
+            <!-- Recipient address -->
+            <div style="font-size: 13px; color: #2a1f14; line-height: 1.6; margin-bottom: 28px;">
+              <strong>To,</strong><br/>
+              <strong>${recipientName}</strong><br/>
+              ${recipientDesignation ? `${recipientDesignation}<br/>` : ''}
+              ${recipientId ? `Emp ID: ${recipientId}<br/>` : ''}
+            </div>
+
+            <!-- Subject -->
+            <div style="text-align: center; margin-bottom: 28px;">
+              <span style="font-size: 13px; font-weight: 700; color: #2a1f14; border-bottom: 1.5px solid #2a1f14; padding-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">
+                Subject: Relieving Letter & Experience Certificate
+              </span>
+            </div>
+
+            <!-- Salutation -->
+            <div style="font-size: 13px; color: #2a1f14; margin-bottom: 16px;">Dear ${recipientName},</div>
+
+            <!-- Body -->
+            <div style="font-size: 13px; line-height: 1.8; color: #3d2d1e; text-align: justify; margin-bottom: 32px; text-indent: 32px;">
+              ${bodyHtml}
+            </div>
+          </div>
+
+          <!-- Closing Sign-off -->
+          <div>
+            <div style="font-size: 13px; color: #2a1f14; margin-bottom: 32px;">
+              <div style="margin-bottom: 8px;">For <strong>Cluso Infolink</strong>,</div>
+              <div style="height: 44px; display: flex; align-items: flex-end; margin-bottom: 8px;">
+                ${respondentSignature ? `
+                  <img src="${respondentSignature}" alt="Signature" style="max-height: 44px; width: auto; object-fit: contain;" />
+                ` : '<div style="height: 44px;"></div>'}
+              </div>
+              <div style="border-top: 1px solid #d4b896; display: inline-block; padding-top: 6px; min-width: 180px;">
+                <strong style="color: #2a1f14;">${respondentName}</strong><br/>
+                <span style="font-size: 11px; color: #8b7355;">${respondentRole}</span><br/>
+                <span style="font-size: 10px; color: #b0a08e;">${respondentDepartment || 'HR Administration'}</span>
+              </div>
+            </div>
+
+            <!-- Footer border -->
+            <div style="text-align: center; border-top: 1px solid #e2d2be; padding-top: 10px; font-size: 9px; color: #a3907e;">
+              Cluso Infolink • Private & Confidential
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (template === 'modern') {
+      return `
+        <div style="font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; width: 640px; height: 900px; margin: 0 auto; padding: 48px 56px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;">
+          <!-- Modern left accent bar -->
+          <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, #3b82f6, #8b5cf6);"></div>
+
+          <div>
+            <!-- Header Letterhead -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <img src="${LOGO_BASE64}" alt="Cluso Infolink Logo" style="height: 34px; width: auto; object-fit: contain;" />
+              <div style="text-align: right; font-size: 10px; color: #64748b; line-height: 1.4;">
+                <span style="font-weight: 700; color: #0f172a;">Cluso Infolink</span><br/>
+                Web: www.cluso.in | Email: hr@cluso.in
+              </div>
+            </div>
+            <div style="width: 100%; height: 1px; background: #e2e8f0; margin-bottom: 24px;"></div>
+
+            <!-- Meta info -->
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #475569; margin-bottom: 24px; font-family: monospace;">
+              <div><strong>REF:</strong> ${refId}</div>
+              <div><strong>DATE:</strong> ${formattedDate}</div>
+            </div>
+
+            <!-- Recipient address -->
+            <div style="font-size: 13px; color: #1e293b; line-height: 1.5; margin-bottom: 24px; background: #f8fafc; padding: 12px 16px; border-radius: 8px; border: 1px solid #f1f5f9;">
+              <div style="font-size: 9px; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px;">Recipient Details</div>
+              <strong>${recipientName}</strong><br/>
+              ${recipientDesignation ? `<span style="color: #475569;">${recipientDesignation}</span><br/>` : ''}
+              ${recipientId ? `<span style="color: #64748b; font-size: 12px;">Emp ID: ${recipientId}</span><br/>` : ''}
+            </div>
+
+            <!-- Subject -->
+            <div style="text-align: center; margin-bottom: 24px;">
+              <span style="font-size: 13px; font-weight: 800; color: #0f172a; border-bottom: 2px solid #3b82f6; padding-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px;">
+                Subject: Relieving Letter & Experience Certificate
+              </span>
+            </div>
+
+            <!-- Salutation -->
+            <div style="font-size: 13px; color: #0f172a; font-weight: 600; margin-bottom: 16px;">Dear ${recipientName},</div>
+
+            <!-- Body -->
+            <div style="font-size: 13px; line-height: 1.7; color: #334155; text-align: justify; margin-bottom: 28px;">
+              ${bodyHtml}
+            </div>
+          </div>
+
+          <!-- Closing Sign-off -->
+          <div>
+            <div style="font-size: 13px; color: #1e293b; margin-bottom: 28px;">
+              <div style="margin-bottom: 8px; color: #475569;">Sincerely,</div>
+              <div style="height: 44px; display: flex; align-items: flex-end; margin-bottom: 8px;">
+                ${respondentSignature ? `
+                  <img src="${respondentSignature}" alt="Signature" style="max-height: 44px; width: auto; object-fit: contain;" />
+                ` : '<div style="height: 44px;"></div>'}
+              </div>
+              <div style="border-top: 1px solid #e2e8f0; display: inline-block; padding-top: 6px; min-width: 180px;">
+                <strong style="color: #0f172a;">${respondentName}</strong><br/>
+                <span style="font-size: 11px; color: #64748b;">${respondentRole}</span><br/>
+                <span style="font-size: 10px; color: #94a3b8;">${respondentDepartment || 'HR Department'}</span>
+              </div>
+            </div>
+
+            <!-- Footer border -->
+            <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 10px; font-size: 9px; color: #94a3b8; font-weight: 500;">
+              Cluso Infolink • Confidential & Official Document
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (template === 'executive') {
+      return `
+        <div style="font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; width: 640px; height: 900px; margin: 0 auto; padding: 48px 56px; background: #ffffff; border: 1px solid #cbd5e1; border-top: 4px solid #1e1b4b; box-shadow: 0 4px 20px rgba(0,0,0,0.05); box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+          <!-- Top gold accent bar just below navy border -->
+          <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #c9a84c;"></div>
+
+          <div>
+            <!-- Header Letterhead -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+              <!-- Logo with clean padding -->
+              <div style="display: inline-block; background: #ffffff; border: 1px solid rgba(201, 168, 76, 0.25); padding: 3px 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                <img src="${LOGO_BASE64}" alt="Cluso Infolink Logo" style="height: 28px; width: auto; display: block; object-fit: contain;" />
+              </div>
+              <div style="text-align: right; font-size: 10px; color: #1e1b4b; line-height: 1.4;">
+                <strong style="color: #c9a84c; text-transform: uppercase; letter-spacing: 0.5px;">Cluso Infolink</strong><br/>
+                <span style="color: #64748b;">HQ: Bangalore, India<br/>
+                Web: www.cluso.in | Email: hr@cluso.in</span>
+              </div>
+            </div>
+            <div style="width: 100%; height: 1px; background: linear-gradient(90deg, #1e1b4b, #c9a84c, transparent); margin-bottom: 24px;"></div>
+
+            <!-- Meta info -->
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #1e1b4b; margin-bottom: 24px;">
+              <div><strong>Ref No:</strong> <span style="color: #c9a84c; font-weight: 600;">${refId}</span></div>
+              <div><strong>Date:</strong> <span>${formattedDate}</span></div>
+            </div>
+
+            <!-- Recipient address -->
+            <div style="font-size: 13px; color: #1e1b4b; line-height: 1.5; margin-bottom: 24px; border-left: 2px solid #c9a84c; padding-left: 14px;">
+              <strong>To,</strong><br/>
+              <strong style="font-size: 14px;">${recipientName}</strong><br/>
+              ${recipientDesignation ? `<span style="color: #475569;">${recipientDesignation}</span><br/>` : ''}
+              ${recipientId ? `<span style="color: #64748b;">Employee ID: ${recipientId}</span><br/>` : ''}
+            </div>
+
+            <!-- Subject -->
+            <div style="text-align: center; margin-bottom: 24px;">
+              <span style="font-size: 13px; font-weight: 700; color: #1e1b4b; border-bottom: 1.5px solid #c9a84c; padding-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px;">
+                Subject: Relieving Letter & Experience Certificate
+              </span>
+            </div>
+
+            <!-- Salutation -->
+            <div style="font-size: 13px; color: #1e1b4b; margin-bottom: 16px;">Dear ${recipientName},</div>
+
+            <!-- Body -->
+            <div style="font-size: 13px; line-height: 1.7; color: #334155; text-align: justify; margin-bottom: 28px;">
+              ${bodyHtml}
+            </div>
+          </div>
+
+          <!-- Closing Sign-off -->
+          <div>
+            <div style="font-size: 13px; color: #1e1b4b; margin-bottom: 24px;">
+              <div style="margin-bottom: 8px;">For <strong>Cluso Infolink</strong>,</div>
+              <div style="height: 46px; display: flex; align-items: flex-end; margin-bottom: 8px;">
+                ${respondentSignature ? `
+                  <div style="display: inline-block; background: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(201, 168, 76, 0.15); box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <img src="${respondentSignature}" alt="Signature" style="max-height: 38px; width: auto; display: block; object-fit: contain;" />
+                  </div>
+                ` : '<div style="height: 46px;"></div>'}
+              </div>
+              <div style="border-top: 1px solid #c9a84c; display: inline-block; padding-top: 6px; min-width: 180px;">
+                <strong style="color: #1e1b4b;">${respondentName}</strong><br/>
+                <span style="font-size: 11px; color: #c9a84c; font-weight: 500;">${respondentRole}</span><br/>
+                <span style="font-size: 10px; color: #64748b;">${respondentDepartment || 'HR Operations'}</span>
+              </div>
+            </div>
+
+            <!-- Footer border -->
+            <div style="text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 9px; color: #94a3b8; letter-spacing: 0.5px; text-transform: uppercase;">
+              Cluso Infolink Private Limited • Strictly Confidential
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
 
   if (template === 'classic') {
     return `
@@ -615,7 +851,7 @@ export default function CertificatesPage() {
           format: [canvas.width, canvas.height]
         });
         pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-        const filename = `${cert.recipientName.replace(/\s+/g, '_')}_Certificate.pdf`;
+        const filename = `${cert.recipientName.replace(/\s+/g, '_')}_${cert.type === 'relieving' ? 'Relieving_Letter' : 'Certificate'}.pdf`;
         pdf.save(filename);
         showMsg('PDF downloaded successfully');
       } else {
@@ -1276,13 +1512,12 @@ export default function CertificatesPage() {
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 4 }}>Preview & Share</h3>
                   <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: '0.88rem' }}>Review the final certificate and share it with the recipient</p>
 
-                  {/* Certificate Preview */}
                   <div style={{
                     background: selectedTemplate === 'executive' ? '#1a1a2e' : '#f1f0ec',
                     padding: 36, borderRadius: 14, border: '1px solid var(--surface-border)',
                     marginBottom: 28, overflow: 'auto',
                   }}>
-                    <div id="certificate-pdf-target" style={{ width: '800px', margin: '0 auto' }}>
+                    <div id="certificate-pdf-target" style={{ width: certType === 'relieving' ? '640px' : '800px', margin: '0 auto' }}>
                       <div dangerouslySetInnerHTML={{ __html: certificateHtml }} />
                     </div>
                   </div>
@@ -1375,7 +1610,7 @@ export default function CertificatesPage() {
 
       {/* Hidden container for PDF download from history */}
       {downloadingCert && (
-        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: '800px', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: downloadingCert.type === 'relieving' ? '640px' : '800px', overflow: 'hidden' }}>
           <div id="certificate-download-target">
             <div dangerouslySetInnerHTML={{ __html: renderCertificateHTML(downloadingCert) }} />
           </div>

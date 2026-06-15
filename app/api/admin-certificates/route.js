@@ -102,12 +102,14 @@ export async function POST(req) {
       const emailHtmlBody = `
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #333333; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
           <div style="text-align: center; margin-bottom: 20px; border-bottom: 1px solid #edf2f7; padding-bottom: 16px;">
-            <h2 style="color: #b8895e; margin: 0; font-size: 1.5rem; font-weight: 700;">Congratulations, ${certificate.recipientName}!</h2>
+            <h2 style="color: #b8895e; margin: 0; font-size: 1.5rem; font-weight: 700;">
+              ${type === 'relieving' ? `Relieving Letter — ${certificate.recipientName}` : `Congratulations, ${certificate.recipientName}!`}
+            </h2>
           </div>
           <p>Dear ${certificate.recipientName},</p>
           <p>We are pleased to present you with your official <strong>${emailTitle}</strong> from Cluso Infolink.</p>
           <p>During your time with us as ${'aeiou'.includes((certificate.recipientDesignation || 'team member').charAt(0).toLowerCase()) ? 'an' : 'a'} <strong>${certificate.recipientDesignation || 'team member'}</strong>, we greatly valued your dedication, efforts, and valuable contributions to the organization.</p>
-          <p>We have generated your certificate as an official document. Please find the high-quality **PDF certificate attached** directly to this email.</p>
+          <p>We have generated your ${type === 'relieving' ? 'relieving letter' : 'certificate'} as an official document. Please find the high-quality **PDF ${type === 'relieving' ? 'document' : 'certificate'} attached** directly to this email.</p>
           <p>Thank you once again, and we wish you the very best in all your future professional achievements and endeavors.</p>
           <div style="margin-top: 28px; border-top: 1px solid #edf2f7; padding-top: 16px;">
             <p style="margin: 0 0 4px; color: #718096; font-size: 0.85rem;">Best regards,</p>
@@ -117,7 +119,7 @@ export async function POST(req) {
       `;
 
       const attachment = pdfBase64 ? {
-        filename: `${certificate.recipientName.replace(/\s+/g, '_')}_Certificate.pdf`,
+        filename: `${certificate.recipientName.replace(/\s+/g, '_')}_${type === 'relieving' ? 'Relieving_Letter' : 'Certificate'}.pdf`,
         contentType: 'application/pdf',
         base64Data: pdfBase64
       } : null;
@@ -164,6 +166,7 @@ function getCertTitle(type, category) {
     completion: 'Certificate of Completion',
     appreciation: 'Certificate of Appreciation',
     achievement: 'Certificate of Achievement',
+    relieving: 'Relieving Letter',
   };
   let title = titles[type] || 'Certificate';
   if (type === 'completion' && category) {

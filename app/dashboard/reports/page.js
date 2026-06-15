@@ -7,6 +7,7 @@ import { FileText, Calendar, User, Check, X, MessageSquare, ChevronDown, Chevron
 export default function ReportsPage() {
   const searchParams = useSearchParams();
   const deptFilter = searchParams.get('dept') || '';
+  const reportIdParam = searchParams.get('reportId') || '';
   
   const [reports, setReports] = useState([]);
   const [filterType, setFilterType] = useState('');
@@ -23,12 +24,47 @@ export default function ReportsPage() {
 
   useEffect(() => { load(); }, []);
 
-  // Auto-expand the filtered department
+  // Auto-expand the filtered department and select/scroll to target reportId
   useEffect(() => {
     if (deptFilter) {
       setExpandedDepts(prev => ({ ...prev, [deptFilter]: true }));
     }
-  }, [deptFilter]);
+    if (reportIdParam && reports.length > 0) {
+      const target = reports.find(r => r.id === reportIdParam);
+      if (target) {
+        const dept = target.employeeDept || 'Unknown';
+        const type = target.formType || 'Unknown';
+        const emp = target.employeeName || 'Unknown';
+        
+        const typeKey = `${dept}-${type}`;
+        const empKey = `${typeKey}-${emp}`;
+        
+        setExpandedDepts(prev => ({ ...prev, [dept]: true }));
+        setExpandedTypes(prev => ({ ...prev, [typeKey]: true }));
+        setExpandedEmps(prev => ({ ...prev, [empKey]: true }));
+        
+        // Retry scrolling until the element is rendered (animations may delay DOM)
+        let attempts = 0;
+        const scrollToTarget = () => {
+          const el = document.getElementById(`report-${reportIdParam}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.transition = 'all 0.5s ease';
+            el.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.5)';
+            el.style.borderColor = '#f59e0b';
+            setTimeout(() => {
+              el.style.boxShadow = '';
+              el.style.borderColor = '';
+            }, 3000);
+          } else if (attempts < 10) {
+            attempts++;
+            setTimeout(scrollToTarget, 200);
+          }
+        };
+        setTimeout(scrollToTarget, 400);
+      }
+    }
+  }, [deptFilter, reportIdParam, reports]);
 
   const filtered = reports.filter(r => {
     const matchType = filterType ? r.formType === filterType : true;
@@ -241,7 +277,7 @@ export default function ReportsPage() {
                                             <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
                                               <div style={{ padding: '12px 20px 20px 96px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                                                 {empReports.sort((a, b) => new Date(b.submittedAt || b.timestamp || 0) - new Date(a.submittedAt || a.timestamp || 0)).map((r, idx) => (
-                                                  <div key={`${r.id}-${idx}`} style={{
+                                                  <div key={`${r.id}-${idx}`} id={`report-${r.id}`} style={{
                                                     background: 'var(--surface)', border: '1px solid var(--surface-border)',
                                                     borderRadius: 12, padding: 20, transition: 'all 0.2s',
                                                     borderLeft: r.status === 'Submitted' || r.status === 'Pending'

@@ -92,7 +92,9 @@ export default function NotificationsPage() {
                 <div key={n.id} 
                   onClick={() => {
                     if (!n.read) markRead(n.id);
-                    if (n.link) router.push(n.link);
+                    if (n.link) {
+                      router.push(n.link);
+                    }
                   }}
                   style={{ padding: '14px 16px', borderRadius: 12, border: `1px solid ${n.read ? 'var(--surface-border)' : cfg.border}`, background: n.read ? 'var(--bg-secondary)' : cfg.bg, cursor: 'pointer', display: 'flex', gap: 14, alignItems: 'flex-start', transition: 'all 0.2s', opacity: n.read ? 0.7 : 1 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
