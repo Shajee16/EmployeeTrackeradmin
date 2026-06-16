@@ -183,7 +183,8 @@ export async function PUT(req) {
       id: uuid(),
       text: sanitizeString(body.adminComment, 1000),
       timestamp: new Date().toISOString(),
-      by: 'admin'
+      by: 'admin',
+      adminName: session.name || session.email || 'Admin'
     };
     if (!updateDoc.$push) updateDoc.$push = {};
     updateDoc.$push.comments = newComment;

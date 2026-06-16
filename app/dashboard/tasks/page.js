@@ -2,8 +2,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ClipboardList, Plus, Search, MessageSquare, Trash2, ChevronDown, Paperclip, Download, X } from 'lucide-react';
+import { useTheme } from '../layout';
 
 export default function TaskManagement() {
+  const themeCtx = useTheme();
+  const loggedInUser = themeCtx?.user;
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState('');
@@ -211,7 +214,8 @@ export default function TaskManagement() {
           id: Math.random().toString(),
           text: updatedText,
           timestamp: new Date().toISOString(),
-          by: 'admin'
+          by: 'admin',
+          adminName: loggedInUser?.name || loggedInUser?.email || 'Admin'
         }];
         return { ...prev, comments: newComments };
       });
@@ -610,7 +614,7 @@ export default function TaskManagement() {
                     <div key={c.id} style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: c.by === 'admin' ? 'var(--primary)' : 'var(--text)' }}>
-                          {c.by === 'admin' ? 'Admin' : 'Employee'}
+                          {c.by === 'admin' ? (c.adminName ? `${c.adminName} (Admin)` : 'Admin') : 'Employee'}
                         </span>
                         <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{new Date(c.timestamp).toLocaleString()}</span>
                       </div>
@@ -640,7 +644,9 @@ export default function TaskManagement() {
               {(commentModal.comments || []).map(c => (
                 <div key={c.id} style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: c.by === 'admin' ? 'var(--primary)' : 'var(--text)' }}>{c.by === 'admin' ? 'Admin' : 'Employee'}</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: c.by === 'admin' ? 'var(--primary)' : 'var(--text)' }}>
+                      {c.by === 'admin' ? (c.adminName ? `${c.adminName} (Admin)` : 'Admin') : 'Employee'}
+                    </span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(c.timestamp).toLocaleString()}</span>
                   </div>
                   <p style={{ fontSize: '0.85rem' }}>{c.text}</p>
