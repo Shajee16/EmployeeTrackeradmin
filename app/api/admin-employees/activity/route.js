@@ -121,7 +121,7 @@ export async function GET(req) {
 
   return NextResponse.json({
     stats,
-    attendance: attendance.map(a => ({ date: a.date, totalHours: a.totalHours })),
+    attendance: attendance.map(a => ({ date: a.date, totalHours: a.totalHours, status: a.status })),
     timeline: timeline.slice(0, 50), // cap at 50 most recent
     leads: leads.map(l => ({
       id: l.id,

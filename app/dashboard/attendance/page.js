@@ -182,7 +182,7 @@ export default function AttendancePage() {
                             const empKey = `${dept}-${emp}`;
                             const records = deptData[emp];
                             const presentDays = records.filter(r => r.status === 'Present').length;
-                            const totalHrs = records.reduce((s, r) => s + (r.totalHours || 0), 0);
+                            const totalHrs = records.reduce((s, r) => s + (r.status === 'Present' ? 6 : (r.totalHours || 0)), 0);
 
                             return (
                               <div key={empKey} style={{ borderBottom: '1px solid var(--surface-border)' }}>
@@ -229,7 +229,8 @@ export default function AttendancePage() {
                                               const hasDetail = hasSessions || hasActivities;
                                               const fmtISO = (iso) => iso ? new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
                                               const fmtSecs = (s) => { const h = Math.floor(s/3600); const m = Math.floor((s%3600)/60); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
-
+                                              const displayHours = r.status === 'Present' ? 6 : (r.totalHours || 0);
+ 
                                               return (
                                                 <React.Fragment key={i}>
                                                   <tr
@@ -247,7 +248,7 @@ export default function AttendancePage() {
                                                     <td style={{ padding: '8px 10px', color: isWeekend ? '#94a3b8' : 'var(--text)' }}>{getDayName(r.date)}</td>
                                                     <td style={{ padding: '8px 10px' }}>{r.loginTime || '-'}</td>
                                                     <td style={{ padding: '8px 10px' }}>{r.logoutTime || '-'}</td>
-                                                    <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.totalHours ? `${Math.floor(r.totalHours)}h ${Math.round((r.totalHours - Math.floor(r.totalHours)) * 60)}m` : '-'}</td>
+                                                    <td style={{ padding: '8px 10px', fontWeight: 600 }}>{displayHours ? `${Math.floor(displayHours)}h ${Math.round((displayHours - Math.floor(displayHours)) * 60)}m` : '-'}</td>
                                                     <td style={{ padding: '8px 10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{r.workMode || '-'}</td>
                                                     <td style={{ padding: '8px 10px' }}><span style={statusBadge(r.status)}>{r.status}</span></td>
                                                   </tr>

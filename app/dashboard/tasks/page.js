@@ -9,7 +9,7 @@ export default function TaskManagement() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ userId: '', title: '', description: '', priority: 'Medium', deadline: '' });
+  const [form, setForm] = useState({ userId: '', title: '', description: '', priority: 'Medium', deadline: '', timeLimitHours: '' });
   const [attachment, setAttachment] = useState(null); // { filename, contentType, data }
   const [commentModal, setCommentModal] = useState(null);
   const [viewModal, setViewModal] = useState(null);
@@ -17,6 +17,53 @@ export default function TaskManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // task to delete
   const fileInputRef = useRef(null);
+
+  const [timeSpentMs, setTimeSpentMs] = useState(0);
+
+  const calculateTimeSpent = (statusLogs) => {
+    if (!statusLogs || statusLogs.length === 0) return 0;
+    let totalMs = 0;
+    let activeStart = null;
+    for (let i = 0; i < statusLogs.length; i++) {
+      const log = statusLogs[i];
+      if (log.status === 'In Progress') {
+        activeStart = new Date(log.timestamp);
+      } else if (activeStart && ['Completed', 'Pending', 'Cancelled'].includes(log.status)) {
+        totalMs += new Date(log.timestamp) - activeStart;
+        activeStart = null;
+      }
+    }
+    if (activeStart) {
+      totalMs += new Date() - activeStart;
+    }
+    return totalMs;
+  };
+
+  const formatTimeSpent = (ms) => {
+    const totalSecs = Math.floor(ms / 1000);
+    const h = Math.floor(totalSecs / 3600);
+    const m = Math.floor((totalSecs % 3600) / 60);
+    const s = totalSecs % 60;
+    return `${h}h ${m}m ${s}s`;
+  };
+
+  useEffect(() => {
+    if (!viewModal) {
+      setTimeSpentMs(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const ms = calculateTimeSpent(viewModal.statusLogs);
+      setTimeSpentMs(ms);
+    };
+
+    updateTimer();
+    if (viewModal.status === 'In Progress') {
+      const timerId = setInterval(updateTimer, 1000);
+      return () => clearInterval(timerId);
+    }
+  }, [viewModal]);
 
   const load = () => {
     fetch(`/api/admin-tasks?t=${Date.now()}`).then(r => r.json()).then(d => setTasks(d.tasks || []));
@@ -76,7 +123,7 @@ export default function TaskManagement() {
       }
       await fetch('/api/admin-tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       setShowCreate(false);
-      setForm({ userId: '', title: '', description: '', priority: 'Medium', deadline: '' });
+      setForm({ userId: '', title: '', description: '', priority: 'Medium', deadline: '', timeLimitHours: '' });
       setAttachment(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       load();
@@ -227,6 +274,10 @@ export default function TaskManagement() {
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Deadline</label>
               <input type="date" value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Time Limit (Hours, Optional)</label>
+              <input type="number" step="0.1" min="0.1" max="1000" placeholder="e.g. 4" value={form.timeLimitHours} onChange={e => setForm({...form, timeLimitHours: e.target.value})} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Description</label>
@@ -423,6 +474,50 @@ export default function TaskManagement() {
                 </div>
               </div>
 
+              {/* Task Timer / Time Limit display */}
+              <div style={{
+                background: 'var(--bg-secondary)', padding: 16, borderRadius: 12, border: '1px solid var(--surface-border)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: 'rgba(99,102,241,0.08)', fontSize: '0.8rem' }}>
+                      ⏱️
+                    </span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Time Spent</span>
+                  </div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'monospace', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {formatTimeSpent(timeSpentMs)}
+                    {viewModal.status === 'In Progress' && (
+                      <span className="live-pulse-dot" style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} />
+                    )}
+                  </div>
+                </div>
+
+                {viewModal.timeLimitHours && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Time Limit: {viewModal.timeLimitHours} hrs</span>
+                      <span style={{ color: timeSpentMs > (viewModal.timeLimitHours * 3600 * 1000) ? '#ef4444' : 'var(--text-secondary)' }}>
+                        {(timeSpentMs / (3600 * 1000)).toFixed(2)} / {viewModal.timeLimitHours} hrs
+                      </span>
+                    </div>
+                    <div style={{ width: '100%', height: 6, background: 'var(--surface-border)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ 
+                        width: `${Math.min(100, (timeSpentMs / (viewModal.timeLimitHours * 3600 * 1000)) * 100)}%`, 
+                        height: '100%', 
+                        background: timeSpentMs > (viewModal.timeLimitHours * 3600 * 1000) ? '#ef4444' : 'var(--primary)',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    {timeSpentMs > (viewModal.timeLimitHours * 3600 * 1000) && (
+                      <p style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 700, margin: '6px 0 0 0' }}>
+                        ⚠️ Employee has exceeded the set time limit of {viewModal.timeLimitHours} hours!
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Description */}
               <div>
                 <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 8, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</h4>
@@ -452,6 +547,57 @@ export default function TaskManagement() {
                         </button>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Status Logs History Timeline */}
+              {viewModal.statusLogs && viewModal.statusLogs.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Activity & Status Log</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingLeft: 8, marginBottom: 20 }}>
+                    {viewModal.statusLogs.map((log, lIdx) => {
+                      const logDate = new Date(log.timestamp).toLocaleString('en-IN', {
+                        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+                      });
+                      const isCompleted = log.status === 'Completed';
+                      const isInProgress = log.status === 'In Progress';
+                      const isPending = log.status === 'Pending';
+                      const badgeColor = isCompleted ? '#10b981' : isInProgress ? 'var(--primary)' : 'var(--text-muted)';
+                      
+                      return (
+                        <div key={lIdx} style={{ display: 'flex', gap: 12, position: 'relative' }}>
+                          {/* Timeline Connector Line */}
+                          {lIdx < viewModal.statusLogs.length - 1 && (
+                            <div style={{ position: 'absolute', left: 7, top: 18, bottom: -18, width: 2, background: 'var(--surface-border)' }} />
+                          )}
+                          {/* Timeline Dot */}
+                          <div style={{
+                            width: 16, height: 16, borderRadius: '50%',
+                            background: badgeColor, border: '3px solid var(--surface)',
+                            boxShadow: '0 0 0 1px var(--surface-border)',
+                            flexShrink: 0, marginTop: 3
+                          }} />
+                          {/* Log Details */}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' }}>
+                                {log.status === 'In Progress' ? '🚀 Task Started' : log.status === 'Completed' ? '✅ Task Completed & Submitted' : log.status === 'Pending' ? '📋 Task Assigned / Set to Pending' : `Task status: ${log.status}`}
+                              </span>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{logDate}</span>
+                            </div>
+                            <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                              Action by: <strong>{log.userName || (log.by === 'admin' ? 'Admin' : 'Employee')}</strong>
+                            </p>
+                            {log.comment && (
+                              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6, margin: '6px 0 0 0', display: 'inline-block', border: '1px solid var(--surface-border)' }}>
+                                {log.comment}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -530,6 +676,16 @@ export default function TaskManagement() {
           </div>
         </div>
       )}
+      <style>{`
+        .live-pulse-dot {
+          animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+          0% { opacity: 0.3; transform: scale(0.9); }
+          50% { opacity: 1; transform: scale(1.1); }
+          100% { opacity: 0.3; transform: scale(0.9); }
+        }
+      `}</style>
     </motion.div>
   );
 }

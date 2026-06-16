@@ -68,6 +68,7 @@ export async function POST(req) {
   }
 
   const taskId = uuid();
+  const timeLimitHours = body.timeLimitHours ? parseFloat(body.timeLimitHours) : null;
   const newTask = {
     id: taskId,
     userId: sanitizeString(body.userId, 50), // Can be employee ID, 'Student Ambassador', or collegeId
@@ -84,6 +85,16 @@ export async function POST(req) {
     createdAt: new Date().toISOString(),
     hasAttachment: false,
     attachmentName: null,
+    timeLimitHours: timeLimitHours && !isNaN(timeLimitHours) ? timeLimitHours : null,
+    statusLogs: [
+      {
+        status: 'Pending',
+        timestamp: new Date().toISOString(),
+        by: 'admin',
+        userName: session.name || session.email || 'Admin',
+        comment: 'Task assigned by admin'
+      }
+    ]
   };
 
   // Handle attachment: validate size, store in MongoDB
@@ -144,14 +155,25 @@ export async function PUT(req) {
   const before = { status: target.status, priority: target.priority };
   const updateFields = {};
   
+  const updateDoc = {};
+  
   if (body.status && isOneOf(body.status, ['Pending', 'In Progress', 'Completed', 'Cancelled'])) {
     updateFields.status = body.status;
+    if (body.status !== target.status) {
+      const logEntry = {
+        status: body.status,
+        timestamp: new Date().toISOString(),
+        by: 'admin',
+        userName: session.name || session.email || 'Admin',
+        comment: body.adminComment || (body.status === 'Pending' ? 'Re-opened/Set to Pending for scrutiny' : `Status updated to ${body.status}`)
+      };
+      updateDoc.$push = { statusLogs: logEntry };
+    }
   }
   if (body.priority && isOneOf(body.priority, ['Low', 'Medium', 'High', 'Critical'])) {
     updateFields.priority = body.priority;
   }
   
-  const updateDoc = {};
   if (Object.keys(updateFields).length > 0) {
     updateDoc.$set = updateFields;
   }
@@ -163,7 +185,8 @@ export async function PUT(req) {
       timestamp: new Date().toISOString(),
       by: 'admin'
     };
-    updateDoc.$push = { comments: newComment };
+    if (!updateDoc.$push) updateDoc.$push = {};
+    updateDoc.$push.comments = newComment;
   }
 
   if (Object.keys(updateDoc).length > 0) {
