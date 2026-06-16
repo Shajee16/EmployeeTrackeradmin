@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import { motion } from 'framer-motion';
 import { ClipboardList, Plus, Search, MessageSquare, Trash2, ChevronDown, Paperclip, Download, X } from 'lucide-react';
 import { useTheme } from '../layout';
@@ -85,6 +85,38 @@ export default function TaskManagement() {
       return matchSearch && matchStatus;
     });
   }, [tasks, search, statusFilter]);
+
+  const [expandedGroups, setExpandedGroups] = useState({});
+
+  const groupedTasks = useMemo(() => {
+    const groups = {};
+    filtered.forEach(t => {
+      const dateKey = t.createdAt 
+        ? new Date(t.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })
+        : 'Unknown Date';
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(t);
+    });
+    
+    return Object.entries(groups).map(([date, items]) => {
+      return { date, items };
+    }).sort((a, b) => {
+      if (a.date === 'Unknown Date') return 1;
+      if (b.date === 'Unknown Date') return -1;
+      const dateA = a.items[0]?.createdAt ? new Date(a.items[0].createdAt) : new Date(0);
+      const dateB = b.items[0]?.createdAt ? new Date(b.items[0].createdAt) : new Date(0);
+      return dateB - dateA;
+    });
+  }, [filtered]);
+
+  const toggleGroup = (date) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [date]: !prev[date]
+    }));
+  };
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
@@ -374,65 +406,102 @@ export default function TaskManagement() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((t, idx) => (
-              <tr key={`${t.id}-${idx}`} style={{ cursor: 'pointer' }} onClick={() => setViewModal(t)}>
-                <td>
-                  <div 
-                    onClick={(e) => { e.stopPropagation(); setViewModal(t); }}
-                    style={{ 
-                      fontWeight: 600, 
-                      color: 'var(--primary)',
-                      cursor: 'pointer',
-                      display: 'inline-block',
-                      transition: 'color 0.2s, text-decoration 0.2s'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
-                    onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
-                  >
-                    {t.title}
-                  </div>
-                  {t.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{t.description.substring(0, 60)}{t.description.length > 60 ? '...' : ''}</div>}
-                  {t.hasAttachment && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); downloadAttachment(t.id, t.attachmentName); }}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4,
-                        background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-                        borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
-                        color: '#6366f1', fontSize: '0.72rem', fontWeight: 600,
-                      }}
-                    >
-                      <Download size={12} /> {t.attachmentName || 'Download'}
-                    </button>
-                  )}
-                </td>
-                <td>
-                  <div style={{ fontWeight: 500 }}>{t.employeeName}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.employeeDept}</div>
-                </td>
-                <td><span className={`badge ${priorityColor(t.priority)}`}>{t.priority}</span></td>
-                <td>
-                  <select value={t.status} onClick={e => e.stopPropagation()} onChange={e => updateStatus(t.id, e.target.value)}
-                    style={{ padding: '4px 8px', fontSize: '0.8rem', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)' }}>
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                </td>
-                <td style={{ fontSize: '0.85rem' }}>{t.deadline ? new Date(t.deadline).toLocaleDateString() : '-'}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
-                    <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setCommentModal(t)} title="Comment">
-                      <MessageSquare size={14} /> {(t.comments?.length || 0)}
-                    </button>
-                    <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setDeleteConfirm(t)} title="Delete">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+            {groupedTasks.map((group) => (
+              <Fragment key={group.date}>
+                <tr 
+                  onClick={() => toggleGroup(group.date)} 
+                  style={{ 
+                    background: 'var(--surface-border)', 
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                  }}
+                  className="group-header-row"
+                >
+                  <td colSpan={6} style={{ padding: '10px 16px', fontWeight: 700, fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <ChevronDown 
+                        size={15} 
+                        style={{ 
+                          transform: expandedGroups[group.date] ? 'rotate(0deg)' : 'rotate(-90deg)', 
+                          transition: 'transform 0.2s ease',
+                          color: 'var(--text-muted)'
+                        }} 
+                      />
+                      <span style={{ color: 'var(--text)' }}>Issued: {group.date}</span>
+                      <span style={{ 
+                        fontSize: '0.7rem', 
+                        color: 'var(--text-muted)', 
+                        background: 'var(--bg-secondary)', 
+                        padding: '1px 6px', 
+                        borderRadius: 10,
+                        fontWeight: 600
+                      }}>
+                        {group.items.length} {group.items.length === 1 ? 'task' : 'tasks'}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+                {expandedGroups[group.date] && group.items.map((t, idx) => (
+                  <tr key={`${t.id}-${idx}`} style={{ cursor: 'pointer' }} onClick={() => setViewModal(t)}>
+                    <td>
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); setViewModal(t); }}
+                        style={{ 
+                          fontWeight: 600, 
+                          color: 'var(--primary)',
+                          cursor: 'pointer',
+                          display: 'inline-block',
+                          transition: 'color 0.2s, text-decoration 0.2s'
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
+                        onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
+                      >
+                        {t.title}
+                      </div>
+                      {t.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{t.description.substring(0, 60)}{t.description.length > 60 ? '...' : ''}</div>}
+                      {t.hasAttachment && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); downloadAttachment(t.id, t.attachmentName); }}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4,
+                            background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+                            borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+                            color: '#6366f1', fontSize: '0.72rem', fontWeight: 600,
+                          }}
+                        >
+                          <Download size={12} /> {t.attachmentName || 'Download'}
+                        </button>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{t.employeeName}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.employeeDept}</div>
+                    </td>
+                    <td><span className={`badge ${priorityColor(t.priority)}`}>{t.priority}</span></td>
+                    <td>
+                      <select value={t.status} onClick={e => e.stopPropagation()} onChange={e => updateStatus(t.id, e.target.value)}
+                        style={{ padding: '4px 8px', fontSize: '0.8rem', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)' }}>
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </td>
+                    <td style={{ fontSize: '0.85rem' }}>{t.deadline ? new Date(t.deadline).toLocaleDateString() : '-'}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                        <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setCommentModal(t)} title="Comment">
+                          <MessageSquare size={14} /> {(t.comments?.length || 0)}
+                        </button>
+                        <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setDeleteConfirm(t)} title="Delete">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
-            {filtered.length === 0 && (
+            {groupedTasks.length === 0 && (
               <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No tasks found.</td></tr>
             )}
           </tbody>
@@ -690,6 +759,10 @@ export default function TaskManagement() {
           0% { opacity: 0.3; transform: scale(0.9); }
           50% { opacity: 1; transform: scale(1.1); }
           100% { opacity: 0.3; transform: scale(0.9); }
+        }
+        .group-header-row:hover {
+          background-color: var(--surface-border) !important;
+          opacity: 0.95;
         }
       `}</style>
     </motion.div>
