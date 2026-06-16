@@ -182,7 +182,7 @@ export default function AttendancePage() {
                             const empKey = `${dept}-${emp}`;
                             const records = deptData[emp];
                             const presentDays = records.filter(r => r.status === 'Present').length;
-                            const totalHrs = records.reduce((s, r) => s + (r.status === 'Present' ? 6 : (r.totalHours || 0)), 0);
+                            const totalHrs = records.reduce((s, r) => s + (r.totalHours ? r.totalHours : (r.status === 'Present' ? 6 : 0)), 0);
 
                             return (
                               <div key={empKey} style={{ borderBottom: '1px solid var(--surface-border)' }}>
@@ -229,7 +229,7 @@ export default function AttendancePage() {
                                               const hasDetail = hasSessions || hasActivities;
                                               const fmtISO = (iso) => iso ? new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
                                               const fmtSecs = (s) => { const h = Math.floor(s/3600); const m = Math.floor((s%3600)/60); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
-                                              const displayHours = r.status === 'Present' ? 6 : (r.totalHours || 0);
+                                              const displayHours = r.totalHours ? r.totalHours : (r.status === 'Present' ? 6 : 0);
  
                                               return (
                                                 <React.Fragment key={i}>

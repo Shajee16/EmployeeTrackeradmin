@@ -290,10 +290,10 @@ export default function EmployeesPage() {
     if (!activityData) return '0h';
     let hours = 0;
     if (!activityDateFilter && activityData.attendance) {
-      hours = activityData.attendance.reduce((sum, a) => sum + (a.status === 'Present' ? 6 : (Number(a.totalHours) || 0)), 0);
+      hours = activityData.attendance.reduce((sum, a) => sum + (a.totalHours ? Number(a.totalHours) : (a.status === 'Present' ? 6 : 0)), 0);
     } else if (activityData.attendance) {
       const dayRecords = activityData.attendance.filter(a => a.date === activityDateFilter);
-      hours = dayRecords.reduce((sum, a) => sum + (a.status === 'Present' ? 6 : (Number(a.totalHours) || 0)), 0);
+      hours = dayRecords.reduce((sum, a) => sum + (a.totalHours ? Number(a.totalHours) : (a.status === 'Present' ? 6 : 0)), 0);
     }
     const h = Math.floor(hours);
     const m = Math.round((hours - h) * 60);
