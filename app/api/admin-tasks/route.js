@@ -60,45 +60,20 @@ export async function POST(req) {
   delete rawBody.attachment;
   const body = sanitizeInput(rawBody);
 
-  if (!isNonEmptyString(body.userId)) {
+  const hasUserIds = Array.isArray(body.userIds) && body.userIds.length > 0;
+  if (!isNonEmptyString(body.userId) && !hasUserIds) {
     return NextResponse.json({ error: 'Employee or target scope (userId) is required' }, { status: 400 });
   }
   if (!isNonEmptyString(body.title)) {
     return NextResponse.json({ error: 'Task title is required' }, { status: 400 });
   }
 
-  const taskId = uuid();
-  const timeLimitHours = body.timeLimitHours ? parseFloat(body.timeLimitHours) : null;
-  const newTask = {
-    id: taskId,
-    userId: sanitizeString(body.userId, 50), // Can be employee ID, 'Student Ambassador', or collegeId
-    scope: body.scope || 'individual', // 'individual' | 'college' | 'department'
-    collegeId: body.collegeId ? sanitizeString(body.collegeId, 50) : null,
-    title: sanitizeString(body.title, 200),
-    description: sanitizeString(body.description || '', 2000),
-    priority: isOneOf(body.priority, ['Low', 'Medium', 'High', 'Critical']) ? body.priority : 'Medium',
-    status: 'Pending',
-    startDate: sanitizeString(body.startDate || new Date().toISOString().split('T')[0], 30),
-    deadline: sanitizeString(body.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 30),
-    comments: [],
-    completionProof: null,
-    createdAt: new Date().toISOString(),
-    hasAttachment: false,
-    attachmentName: null,
-    timeLimitHours: timeLimitHours && !isNaN(timeLimitHours) ? timeLimitHours : null,
-    statusLogs: [
-      {
-        status: 'Pending',
-        timestamp: new Date().toISOString(),
-        by: 'admin',
-        userName: session.name || session.email || 'Admin',
-        comment: 'Task assigned by admin'
-      }
-    ]
-  };
+  const userIds = hasUserIds ? body.userIds : [body.userId];
+  const db = await getDb();
+  const createdTasks = [];
 
-  // Handle attachment: validate size, store in MongoDB
-  let attachmentData = null;
+  // Parse and validate attachment details once
+  let rawAttachmentData = null;
   if (rawAttachment && rawAttachment.data && rawAttachment.filename) {
     const base64Part = rawAttachment.data.split(',')[1] || rawAttachment.data;
     const sizeInBytes = Math.ceil(base64Part.length * 3 / 4);
@@ -107,32 +82,73 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Attachment exceeds 3 MB limit' }, { status: 400 });
     }
 
-    const db = await getDb();
-    attachmentData = {
-      taskId,
+    rawAttachmentData = {
       filename: sanitizeString(rawAttachment.filename, 200),
       contentType: sanitizeString(rawAttachment.contentType || 'application/octet-stream', 100),
       base64Data: base64Part,
       sizeBytes: sizeInBytes,
-      createdAt: new Date().toISOString(),
     };
-    await db.collection('task_attachments').insertOne(attachmentData);
-
-    newTask.hasAttachment = true;
-    newTask.attachmentName = attachmentData.filename;
   }
 
-  const db = await getDb();
-  await db.collection('tasks').insertOne(newTask);
+  for (const uId of userIds) {
+    const taskId = uuid();
+    const timeLimitHours = body.timeLimitHours ? parseFloat(body.timeLimitHours) : null;
+    const newTask = {
+      id: taskId,
+      userId: sanitizeString(uId, 50), // Can be employee ID, 'Student Ambassador', or collegeId
+      scope: body.scope || 'individual', // 'individual' | 'college' | 'department'
+      collegeId: body.collegeId ? sanitizeString(body.collegeId, 50) : null,
+      title: sanitizeString(body.title, 200),
+      description: sanitizeString(body.description || '', 2000),
+      priority: isOneOf(body.priority, ['Low', 'Medium', 'High', 'Critical']) ? body.priority : 'Medium',
+      status: 'Pending',
+      startDate: sanitizeString(body.startDate || new Date().toISOString().split('T')[0], 30),
+      deadline: sanitizeString(body.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 30),
+      comments: [],
+      completionProof: null,
+      createdAt: new Date().toISOString(),
+      hasAttachment: false,
+      attachmentName: null,
+      timeLimitHours: timeLimitHours && !isNaN(timeLimitHours) ? timeLimitHours : null,
+      statusLogs: [
+        {
+          status: 'Pending',
+          timestamp: new Date().toISOString(),
+          by: 'admin',
+          userName: session.name || session.email || 'Admin',
+          comment: 'Task assigned by admin'
+        }
+      ]
+    };
 
-  await logAdminAction(session, 'CREATE_TASK', 'task', newTask.id, {
-    title: newTask.title,
-    assignedTo: newTask.userId,
-    scope: newTask.scope,
-    priority: newTask.priority,
-  });
+    if (rawAttachmentData) {
+      const attachmentData = {
+        taskId,
+        filename: rawAttachmentData.filename,
+        contentType: rawAttachmentData.contentType,
+        base64Data: rawAttachmentData.base64Data,
+        sizeBytes: rawAttachmentData.sizeBytes,
+        createdAt: new Date().toISOString(),
+      };
+      await db.collection('task_attachments').insertOne(attachmentData);
 
-  return NextResponse.json({ task: newTask });
+      newTask.hasAttachment = true;
+      newTask.attachmentName = attachmentData.filename;
+    }
+
+    await db.collection('tasks').insertOne(newTask);
+
+    await logAdminAction(session, 'CREATE_TASK', 'task', newTask.id, {
+      title: newTask.title,
+      assignedTo: newTask.userId,
+      scope: newTask.scope,
+      priority: newTask.priority,
+    });
+
+    createdTasks.push(newTask);
+  }
+
+  return NextResponse.json({ task: createdTasks[0], tasks: createdTasks });
 }
 
 export async function PUT(req) {

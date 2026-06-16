@@ -12,7 +12,7 @@ export default function TaskManagement() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ userId: '', title: '', description: '', priority: 'Medium', deadline: '', timeLimitHours: '' });
+  const [form, setForm] = useState({ userId: '', userIds: [], title: '', description: '', priority: 'Medium', deadline: '', timeLimitHours: '' });
   const [attachment, setAttachment] = useState(null); // { filename, contentType, data }
   const [commentModal, setCommentModal] = useState(null);
   const [viewModal, setViewModal] = useState(null);
@@ -20,6 +20,20 @@ export default function TaskManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // task to delete
   const fileInputRef = useRef(null);
+
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [empSearch, setEmpSearch] = useState('');
+  const employeeDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (employeeDropdownRef.current && !employeeDropdownRef.current.contains(e.target)) {
+        setShowEmployeeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   const [timeSpentMs, setTimeSpentMs] = useState(0);
 
@@ -158,7 +172,7 @@ export default function TaskManagement() {
       }
       await fetch('/api/admin-tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       setShowCreate(false);
-      setForm({ userId: '', title: '', description: '', priority: 'Medium', deadline: '', timeLimitHours: '' });
+      setForm({ userId: '', userIds: [], title: '', description: '', priority: 'Medium', deadline: '', timeLimitHours: '' });
       setAttachment(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       load();
@@ -288,12 +302,159 @@ export default function TaskManagement() {
         <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} onSubmit={handleCreate} className="card" style={{ padding: 24, marginBottom: 24 }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 16 }}>Assign New Task</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-            <div>
+            <div ref={employeeDropdownRef} style={{ position: 'relative' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Assign To</label>
-              <select required value={form.userId} onChange={e => setForm({...form, userId: e.target.value})}>
-                <option value="">Select Employee...</option>
-                {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.department})</option>)}
-              </select>
+              <div 
+                onClick={() => setShowEmployeeDropdown(!showEmployeeDropdown)}
+                style={{
+                  padding: '10px 14px',
+                  background: 'var(--bg-secondary)',
+                  border: '1.5px solid var(--surface-border)',
+                  borderRadius: 12,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  minHeight: 44,
+                  boxSizing: 'border-box'
+                }}
+              >
+                <span style={{ color: form.userIds.length > 0 ? 'var(--text)' : 'var(--text-muted)' }}>
+                  {form.userIds.length === 0 
+                    ? 'Select Employees...' 
+                    : form.userIds.length === 1 
+                      ? `${employees.find(e => e.id === form.userIds[0])?.name || '1 employee'} selected`
+                      : `${form.userIds.length} employees selected`
+                  }
+                </span>
+                <ChevronDown size={16} style={{ color: 'var(--text-muted)', transform: showEmployeeDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </div>
+
+              {showEmployeeDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '105%',
+                  left: 0,
+                  right: 0,
+                  background: 'var(--surface-overlay)',
+                  border: '1.5px solid var(--surface-border)',
+                  borderRadius: 12,
+                  boxShadow: 'var(--shadow-md)',
+                  zIndex: 200,
+                  padding: 12,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  maxHeight: 280
+                }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input 
+                      type="text" 
+                      placeholder="Search employee..." 
+                      value={empSearch}
+                      onChange={e => setEmpSearch(e.target.value)}
+                      style={{ 
+                        padding: '6px 10px', 
+                        fontSize: '0.8rem', 
+                        borderRadius: 8,
+                        border: '1px solid var(--surface-border)',
+                        background: 'var(--bg)',
+                        color: 'var(--text)',
+                        flex: 1
+                      }}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const filteredIds = employees
+                          .filter(e => e.name.toLowerCase().includes(empSearch.toLowerCase()))
+                          .map(e => e.id);
+                        setForm(prev => ({
+                          ...prev,
+                          userIds: Array.from(new Set([...prev.userIds, ...filteredIds]))
+                        }));
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        border: '1.5px solid var(--surface-border)',
+                        borderRadius: 6,
+                        background: 'var(--bg)',
+                        color: 'var(--text)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      All
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setForm(prev => ({ ...prev, userIds: [] }));
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        border: '1.5px solid var(--surface-border)',
+                        borderRadius: 6,
+                        background: 'var(--bg)',
+                        color: 'var(--text)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+                    {employees
+                      .filter(emp => emp.name.toLowerCase().includes(empSearch.toLowerCase()))
+                      .map(emp => {
+                        const isChecked = form.userIds.includes(emp.id);
+                        return (
+                          <label 
+                            key={emp.id} 
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: 10, 
+                              fontSize: '0.85rem', 
+                              padding: '6px 8px', 
+                              borderRadius: 8, 
+                              cursor: 'pointer',
+                              background: isChecked ? 'rgba(99,102,241,0.06)' : 'transparent',
+                              transition: 'background 0.2s'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = isChecked ? 'rgba(99,102,241,0.08)' : 'var(--bg-secondary)'}
+                            onMouseLeave={e => e.currentTarget.style.background = isChecked ? 'rgba(99,102,241,0.06)' : 'transparent'}
+                          >
+                            <input 
+                              type="checkbox" 
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setForm(prev => ({ ...prev, userIds: prev.userIds.filter(id => id !== emp.id) }));
+                                } else {
+                                  setForm(prev => ({ ...prev, userIds: [...prev.userIds, emp.id] }));
+                                }
+                              }}
+                              style={{ width: 14, height: 14, cursor: 'pointer' }}
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontWeight: 600, color: 'var(--text)' }}>{emp.name}</span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{emp.department}</span>
+                            </div>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Task Title</label>
@@ -370,7 +531,7 @@ export default function TaskManagement() {
               )}
             </div>
           </div>
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={submitting}>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={submitting || form.userIds.length === 0}>
             {submitting ? '⏳ Assigning...' : 'Assign Task'}
           </button>
         </motion.form>
