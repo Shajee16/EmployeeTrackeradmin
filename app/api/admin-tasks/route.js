@@ -39,7 +39,7 @@ export async function GET() {
     return { ...t, employeeName: u ? u.name : 'Unknown', employeeDept: u ? u.department : 'Unknown' };
   });
 
-  enhanced.sort((a, b) => new Date(b.deadline || 0) - new Date(a.deadline || 0));
+  enhanced.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   return NextResponse.json({ tasks: enhanced });
 }
 
@@ -168,26 +168,103 @@ export async function PUT(req) {
 
   if (!target) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const before = { status: target.status, priority: target.priority };
+  const before = {
+    status: target.status,
+    priority: target.priority,
+    title: target.title,
+    description: target.description,
+    deadline: target.deadline,
+    timeLimitHours: target.timeLimitHours,
+    userId: target.userId,
+    hasAttachment: target.hasAttachment,
+    attachmentName: target.attachmentName
+  };
   const updateFields = {};
   
   const updateDoc = {};
   
-  if (body.status && isOneOf(body.status, ['Pending', 'In Progress', 'Completed', 'Cancelled'])) {
-    updateFields.status = body.status;
-    if (body.status !== target.status) {
-      const logEntry = {
-        status: body.status,
-        timestamp: new Date().toISOString(),
-        by: 'admin',
-        userName: session.name || session.email || 'Admin',
-        comment: body.adminComment || (body.status === 'Pending' ? 'Re-opened/Set to Pending for scrutiny' : `Status updated to ${body.status}`)
-      };
-      updateDoc.$push = { statusLogs: logEntry };
+  if (body.isEdit) {
+    if (body.title !== undefined) updateFields.title = sanitizeString(body.title, 200);
+    if (body.description !== undefined) updateFields.description = sanitizeString(body.description, 2000);
+    if (body.priority && isOneOf(body.priority, ['Low', 'Medium', 'High', 'Critical'])) {
+      updateFields.priority = body.priority;
     }
-  }
-  if (body.priority && isOneOf(body.priority, ['Low', 'Medium', 'High', 'Critical'])) {
-    updateFields.priority = body.priority;
+    if (body.deadline !== undefined) updateFields.deadline = sanitizeString(body.deadline, 30);
+    
+    const timeLimitHours = body.timeLimitHours ? parseFloat(body.timeLimitHours) : null;
+    updateFields.timeLimitHours = timeLimitHours && !isNaN(timeLimitHours) ? timeLimitHours : null;
+    
+    if (body.userId !== undefined) updateFields.userId = sanitizeString(body.userId, 50);
+
+    // Attachment
+    let newAttachmentData = null;
+    const rawAttachment = body.attachment || null;
+    if (rawAttachment && rawAttachment.data && rawAttachment.filename) {
+      const base64Part = rawAttachment.data.split(',')[1] || rawAttachment.data;
+      const sizeInBytes = Math.ceil(base64Part.length * 3 / 4);
+      if (sizeInBytes > MAX_ATTACHMENT_SIZE) {
+        return NextResponse.json({ error: 'Attachment exceeds 3 MB limit' }, { status: 400 });
+      }
+      newAttachmentData = {
+        filename: sanitizeString(rawAttachment.filename, 200),
+        contentType: sanitizeString(rawAttachment.contentType || 'application/octet-stream', 100),
+        base64Data: base64Part,
+        sizeBytes: sizeInBytes,
+      };
+    }
+
+    if (newAttachmentData) {
+      await db.collection('task_attachments').deleteMany({ taskId: body.id });
+      const attachmentData = {
+        taskId: body.id,
+        filename: newAttachmentData.filename,
+        contentType: newAttachmentData.contentType,
+        base64Data: newAttachmentData.base64Data,
+        sizeBytes: newAttachmentData.sizeBytes,
+        createdAt: new Date().toISOString(),
+      };
+      await db.collection('task_attachments').insertOne(attachmentData);
+      
+      updateFields.hasAttachment = true;
+      updateFields.attachmentName = attachmentData.filename;
+    } else if (body.removeAttachment) {
+      await db.collection('task_attachments').deleteMany({ taskId: body.id });
+      updateFields.hasAttachment = false;
+      updateFields.attachmentName = null;
+    }
+
+    if (body.status && isOneOf(body.status, ['Pending', 'In Progress', 'Completed', 'Cancelled'])) {
+      updateFields.status = body.status;
+    }
+
+    const statusChanged = body.status && body.status !== target.status;
+    const logEntry = {
+      status: body.status || target.status,
+      timestamp: new Date().toISOString(),
+      by: 'admin',
+      userName: session.name || session.email || 'Admin',
+      comment: statusChanged 
+        ? `Task details & status updated to ${body.status} by admin`
+        : 'Task details updated by admin'
+    };
+    updateDoc.$push = { statusLogs: logEntry };
+  } else {
+    if (body.status && isOneOf(body.status, ['Pending', 'In Progress', 'Completed', 'Cancelled'])) {
+      updateFields.status = body.status;
+      if (body.status !== target.status) {
+        const logEntry = {
+          status: body.status,
+          timestamp: new Date().toISOString(),
+          by: 'admin',
+          userName: session.name || session.email || 'Admin',
+          comment: body.adminComment || (body.status === 'Pending' ? 'Re-opened/Set to Pending for scrutiny' : `Status updated to ${body.status}`)
+        };
+        updateDoc.$push = { statusLogs: logEntry };
+      }
+    }
+    if (body.priority && isOneOf(body.priority, ['Low', 'Medium', 'High', 'Critical'])) {
+      updateFields.priority = body.priority;
+    }
   }
   
   if (Object.keys(updateFields).length > 0) {
@@ -214,7 +291,17 @@ export async function PUT(req) {
 
   await logAdminAction(session, 'UPDATE_TASK', 'task', body.id, {
     before,
-    after: { status: updatedTask.status, priority: updatedTask.priority },
+    after: {
+      status: updatedTask.status,
+      priority: updatedTask.priority,
+      title: updatedTask.title,
+      description: updatedTask.description,
+      deadline: updatedTask.deadline,
+      timeLimitHours: updatedTask.timeLimitHours,
+      userId: updatedTask.userId,
+      hasAttachment: updatedTask.hasAttachment,
+      attachmentName: updatedTask.attachmentName
+    },
   });
 
   return NextResponse.json({ task: updatedTask });

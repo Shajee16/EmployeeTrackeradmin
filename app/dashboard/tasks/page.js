@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import { motion } from 'framer-motion';
-import { ClipboardList, Plus, Search, MessageSquare, Trash2, ChevronDown, Paperclip, Download, X } from 'lucide-react';
+import { ClipboardList, Plus, Search, MessageSquare, Trash2, ChevronDown, Paperclip, Download, X, Edit } from 'lucide-react';
 import { useTheme } from '../layout';
 
 export default function TaskManagement() {
@@ -20,6 +20,13 @@ export default function TaskManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // task to delete
   const fileInputRef = useRef(null);
+
+  // States for Task Editing
+  const [editModal, setEditModal] = useState(null); // task object being edited
+  const [editForm, setEditForm] = useState({ id: '', userId: '', title: '', description: '', priority: 'Medium', deadline: '', timeLimitHours: '', status: '' });
+  const [editAttachment, setEditAttachment] = useState(null);
+  const [editRemoveAttachment, setEditRemoveAttachment] = useState(false);
+  const editFileInputRef = useRef(null);
 
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [empSearch, setEmpSearch] = useState('');
@@ -93,7 +100,8 @@ export default function TaskManagement() {
 
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
-    return tasks.filter(t => {
+    const sorted = [...tasks].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    return sorted.filter(t => {
       const matchSearch = t.title.toLowerCase().includes(s) || (t.employeeName || '').toLowerCase().includes(s);
       const matchStatus = statusFilter ? t.status === statusFilter : true;
       return matchSearch && matchStatus;
@@ -178,6 +186,92 @@ export default function TaskManagement() {
       load();
     } catch (err) {
       console.error('Task creation error:', err);
+    }
+    setSubmitting(false);
+  };
+
+  const openEditModal = (task) => {
+    setEditModal(task);
+    setEditForm({
+      id: task.id,
+      userId: task.userId || '',
+      title: task.title || '',
+      description: task.description || '',
+      priority: task.priority || 'Medium',
+      deadline: task.deadline ? new Date(task.deadline).toISOString().split('T')[0] : '',
+      timeLimitHours: task.timeLimitHours || '',
+      status: task.status || 'Pending'
+    });
+    setEditAttachment(null);
+    setEditRemoveAttachment(false);
+    if (editFileInputRef.current) editFileInputRef.current.value = '';
+  };
+
+  const handleEditFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.size > 3 * 1024 * 1024) {
+      alert('File exceeds 3 MB limit. Please choose a smaller file.');
+      e.target.value = '';
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEditAttachment({
+        filename: file.name,
+        contentType: file.type || 'application/octet-stream',
+        data: reader.result,
+      });
+      setEditRemoveAttachment(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeEditAttachment = () => {
+    setEditAttachment(null);
+    if (editFileInputRef.current) editFileInputRef.current.value = '';
+  };
+
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const payload = {
+        id: editForm.id,
+        isEdit: true,
+        userId: editForm.userId,
+        title: editForm.title,
+        description: editForm.description,
+        priority: editForm.priority,
+        deadline: editForm.deadline,
+        timeLimitHours: editForm.timeLimitHours,
+        status: editForm.status,
+        removeAttachment: editRemoveAttachment
+      };
+      if (editAttachment) {
+        payload.attachment = {
+          filename: editAttachment.filename,
+          contentType: editAttachment.contentType,
+          data: editAttachment.data,
+        };
+      }
+      const res = await fetch('/api/admin-tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update task');
+      
+      setEditModal(null);
+      setEditAttachment(null);
+      setEditRemoveAttachment(false);
+      load();
+    } catch (err) {
+      console.error('Task update error:', err);
+      alert('Error updating task: ' + err.message);
     }
     setSubmitting(false);
   };
@@ -602,64 +696,108 @@ export default function TaskManagement() {
                     </div>
                   </td>
                 </tr>
-                {expandedGroups[group.date] && group.items.map((t, idx) => (
-                  <tr key={`${t.id}-${idx}`} style={{ cursor: 'pointer' }} onClick={() => setViewModal(t)}>
-                    <td>
-                      <div 
-                        onClick={(e) => { e.stopPropagation(); setViewModal(t); }}
-                        style={{ 
-                          fontWeight: 600, 
-                          color: 'var(--primary)',
-                          cursor: 'pointer',
-                          display: 'inline-block',
-                          transition: 'color 0.2s, text-decoration 0.2s'
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
-                        onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
-                      >
-                        {t.title}
-                      </div>
-                      {t.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{t.description.substring(0, 60)}{t.description.length > 60 ? '...' : ''}</div>}
-                      {t.hasAttachment && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); downloadAttachment(t.id, t.attachmentName); }}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4,
-                            background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-                            borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
-                            color: '#6366f1', fontSize: '0.72rem', fontWeight: 600,
-                          }}
-                        >
-                          <Download size={12} /> {t.attachmentName || 'Download'}
-                        </button>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{t.employeeName}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.employeeDept}</div>
-                    </td>
-                    <td><span className={`badge ${priorityColor(t.priority)}`}>{t.priority}</span></td>
-                    <td>
-                      <select value={t.status} onClick={e => e.stopPropagation()} onChange={e => updateStatus(t.id, e.target.value)}
-                        style={{ padding: '4px 8px', fontSize: '0.8rem', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)' }}>
-                        <option value="Pending">Pending</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                      </select>
-                    </td>
-                    <td style={{ fontSize: '0.85rem' }}>{t.deadline ? new Date(t.deadline).toLocaleDateString() : '-'}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
-                        <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setCommentModal(t)} title="Comment">
-                          <MessageSquare size={14} /> {(t.comments?.length || 0)}
-                        </button>
-                        <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setDeleteConfirm(t)} title="Delete">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {expandedGroups[group.date] && (() => {
+                  const statusGroups = {
+                    'Pending': [],
+                    'In Progress': [],
+                    'Completed': [],
+                    'Cancelled': []
+                  };
+                  group.items.forEach(t => {
+                    if (statusGroups[t.status]) {
+                      statusGroups[t.status].push(t);
+                    } else {
+                      statusGroups[t.status] = [t];
+                    }
+                  });
+
+                  const orderedStatuses = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
+                  return orderedStatuses.map(status => {
+                    const statusItems = statusGroups[status] || [];
+                    if (statusItems.length === 0) return null;
+
+                    return (
+                      <Fragment key={status}>
+                        {/* Sub-header for Status */}
+                        <tr style={{ background: 'rgba(99, 102, 241, 0.03)', borderBottom: '1px solid var(--surface-border)' }}>
+                          <td colSpan={6} style={{ padding: '6px 24px', fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <span style={{ 
+                              display: 'inline-block', 
+                              width: 6, 
+                              height: 6, 
+                              borderRadius: '50%', 
+                              background: status === 'Completed' ? '#10b981' : status === 'In Progress' ? '#f59e0b' : '#3b82f6',
+                              marginRight: 8,
+                              verticalAlign: 'middle'
+                            }} />
+                            {status} ({statusItems.length} {statusItems.length === 1 ? 'task' : 'tasks'})
+                          </td>
+                        </tr>
+                        {statusItems.map((t, idx) => (
+                          <tr key={`${t.id}-${idx}`} style={{ cursor: 'pointer' }} onClick={() => setViewModal(t)}>
+                            <td>
+                              <div 
+                                onClick={(e) => { e.stopPropagation(); setViewModal(t); }}
+                                style={{ 
+                                  fontWeight: 600, 
+                                  color: 'var(--primary)',
+                                  cursor: 'pointer',
+                                  display: 'inline-block',
+                                  transition: 'color 0.2s, text-decoration 0.2s'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
+                                onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
+                              >
+                                {t.title}
+                              </div>
+                              {t.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{t.description.substring(0, 60)}{t.description.length > 60 ? '...' : ''}</div>}
+                              {t.hasAttachment && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); downloadAttachment(t.id, t.attachmentName); }}
+                                  style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4,
+                                    background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+                                    borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+                                    color: '#6366f1', fontSize: '0.72rem', fontWeight: 600,
+                                  }}
+                                >
+                                  <Download size={12} /> {t.attachmentName || 'Download'}
+                                </button>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 500 }}>{t.employeeName}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.employeeDept}</div>
+                            </td>
+                            <td><span className={`badge ${priorityColor(t.priority)}`}>{t.priority}</span></td>
+                            <td>
+                              <select value={t.status} onClick={e => e.stopPropagation()} onChange={e => updateStatus(t.id, e.target.value)}
+                                style={{ padding: '4px 8px', fontSize: '0.8rem', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)' }}>
+                                <option value="Pending">Pending</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                              </select>
+                            </td>
+                            <td style={{ fontSize: '0.85rem' }}>{t.deadline ? new Date(t.deadline).toLocaleDateString() : '-'}</td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                                <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem', borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => openEditModal(t)} title="Edit Task">
+                                  <Edit size={14} />
+                                </button>
+                                <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setCommentModal(t)} title="Comment">
+                                  <MessageSquare size={14} /> {(t.comments?.length || 0)}
+                                </button>
+                                <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setDeleteConfirm(t)} title="Delete">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    );
+                  });
+                })()}
               </Fragment>
             ))}
             {groupedTasks.length === 0 && (
@@ -862,6 +1000,187 @@ export default function TaskManagement() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Task Edit Modal */}
+      {editModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }} onClick={() => setEditModal(null)}>
+          <form className="card" onSubmit={handleUpdateTask} style={{ width: '100%', maxWidth: 650, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Edit Task</h3>
+              <button type="button" onClick={() => setEditModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
+            </div>
+            
+            {/* Scrollable Content */}
+            <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Assign To</label>
+                  <select 
+                    value={editForm.userId} 
+                    onChange={e => setEditForm({...editForm, userId: e.target.value})} 
+                    required
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 12, fontSize: '0.9rem', color: 'var(--text)', outline: 'none' }}
+                  >
+                    <option value="">Select Employee...</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.department})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Task Title</label>
+                  <input 
+                    required 
+                    value={editForm.title} 
+                    onChange={e => setEditForm({...editForm, title: e.target.value})} 
+                    placeholder="e.g. Complete sales report" 
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 12, fontSize: '0.9rem', color: 'var(--text)' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Priority</label>
+                  <select 
+                    value={editForm.priority} 
+                    onChange={e => setEditForm({...editForm, priority: e.target.value})}
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 12, fontSize: '0.9rem', color: 'var(--text)', outline: 'none' }}
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Status</label>
+                  <select 
+                    value={editForm.status} 
+                    onChange={e => setEditForm({...editForm, status: e.target.value})}
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 12, fontSize: '0.9rem', color: 'var(--text)', outline: 'none' }}
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Deadline</label>
+                  <input 
+                    type="date" 
+                    value={editForm.deadline} 
+                    onChange={e => setEditForm({...editForm, deadline: e.target.value})} 
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 12, fontSize: '0.9rem', color: 'var(--text)' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Time Limit (Hours, Optional)</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0.1" 
+                    max="1000" 
+                    placeholder="e.g. 4" 
+                    value={editForm.timeLimitHours} 
+                    onChange={e => setEditForm({...editForm, timeLimitHours: e.target.value})} 
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 12, fontSize: '0.9rem', color: 'var(--text)' }}
+                  />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Description</label>
+                  <textarea 
+                    rows={3} 
+                    value={editForm.description} 
+                    onChange={e => setEditForm({...editForm, description: e.target.value})} 
+                    placeholder="Task details..." 
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 12, fontSize: '0.9rem', color: 'var(--text)', outline: 'none', resize: 'vertical' }}
+                  />
+                </div>
+
+                {/* Attachment Section */}
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                    <Paperclip size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                    Attachment (Optional, max 3 MB)
+                  </label>
+                  
+                  {editModal.hasAttachment && !editRemoveAttachment ? (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                      background: 'rgba(99,102,241,0.06)', borderRadius: 10, border: '1.5px solid rgba(99,102,241,0.2)',
+                      marginBottom: 8
+                    }}>
+                      <Paperclip size={18} color="#6366f1" />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)' }}>Current: {editModal.attachmentName}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditRemoveAttachment(true)}
+                        style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', fontWeight: 600 }}
+                      >
+                        <X size={14} /> Remove
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {(!editModal.hasAttachment || editRemoveAttachment) && !editAttachment ? (
+                    <div
+                      style={{
+                        border: '2px dashed var(--surface-border)', borderRadius: 10, padding: '18px 20px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                        cursor: 'pointer', background: 'var(--bg-secondary)', transition: 'all 0.2s',
+                      }}
+                      onClick={() => editFileInputRef.current?.click()}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'var(--surface)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                    >
+                      <Paperclip size={20} color="var(--text-muted)" />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        Click to attach a new file (PDF, Image, Document, etc.)
+                      </span>
+                      <input
+                        ref={editFileInputRef}
+                        type="file"
+                        onChange={handleEditFileSelect}
+                        style={{ display: 'none' }}
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp,.zip,.rar"
+                      />
+                    </div>
+                  ) : editAttachment ? (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                      background: 'rgba(99,102,241,0.06)', borderRadius: 10, border: '1.5px solid rgba(99,102,241,0.2)',
+                    }}>
+                      <Paperclip size={18} color="#6366f1" />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)' }}>New: {editAttachment.filename}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{editAttachment.contentType}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={removeEditAttachment}
+                        style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', fontWeight: 600 }}
+                      >
+                        <X size={14} /> Remove
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            
+            {/* Footer Actions */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: 12, justifyContent: 'flex-end', background: 'var(--bg-secondary)' }}>
+              <button type="button" className="btn btn-outline" onClick={() => setEditModal(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
