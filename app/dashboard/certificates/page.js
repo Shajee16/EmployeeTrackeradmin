@@ -153,7 +153,7 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
               <img src="${LOGO_BASE64}" alt="Cluso Infolink Logo" style="height: 38px; width: auto; object-fit: contain;" />
               <div style="text-align: right; font-size: 10px; color: #7c5e3f; line-height: 1.4; font-family: 'Georgia', serif; font-style: italic;">
                 <strong>Cluso Infolink</strong><br/>
-                Web: www.cluso.in | Email: hr@cluso.in
+                Web: www.cluso.in | Email: indiaops@cluso.in
               </div>
             </div>
             <div style="width: 100%; height: 2px; background: linear-gradient(90deg, #c29b76, transparent); margin-bottom: 24px;"></div>
@@ -238,7 +238,7 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
               <img src="${LOGO_BASE64}" alt="Cluso Infolink Logo" style="height: 34px; width: auto; object-fit: contain;" />
               <div style="text-align: right; font-size: 10px; color: #64748b; line-height: 1.4;">
                 <span style="font-weight: 700; color: #0f172a;">Cluso Infolink</span><br/>
-                Web: www.cluso.in | Email: hr@cluso.in
+                Web: www.cluso.in | Email: indiaops@cluso.in
               </div>
             </div>
             <div style="width: 100%; height: 1px; background: #e2e8f0; margin-bottom: 24px;"></div>
@@ -327,7 +327,7 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
               <div style="text-align: right; font-size: 10px; color: #1e1b4b; line-height: 1.4;">
                 <strong style="color: #c9a84c; text-transform: uppercase; letter-spacing: 0.5px;">Cluso Infolink</strong><br/>
                 <span style="color: #64748b;">HQ: Bangalore, India<br/>
-                Web: www.cluso.in | Email: hr@cluso.in</span>
+                Web: www.cluso.in | Email: indiaops@cluso.in</span>
               </div>
             </div>
             <div style="width: 100%; height: 1px; background: linear-gradient(90deg, #1e1b4b, #c9a84c, transparent); margin-bottom: 24px;"></div>
