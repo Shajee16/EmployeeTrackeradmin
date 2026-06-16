@@ -13,6 +13,8 @@ export default function AdminSettingsPage() {
   // Profile state
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('');
+  const [department, setDepartment] = useState('');
   const [profilePic, setProfilePic] = useState(null);
   const [picError, setPicError] = useState('');
   const [picUploading, setPicUploading] = useState(false);
@@ -39,6 +41,8 @@ export default function AdminSettingsPage() {
       if (d.settings) {
         setDisplayName(d.settings.displayName || '');
         setPhone(d.settings.phone || '');
+        setRole(d.settings.role || '');
+        setDepartment(d.settings.department || '');
         setProfilePic(d.settings.profilePicture || null);
         setNotifs({
           notifLeadAssigned: d.settings.notifLeadAssigned !== false,
@@ -54,7 +58,7 @@ export default function AdminSettingsPage() {
 
   const saveProfile = async () => {
     setLoading(true);
-    await fetch('/api/admin-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'profile', displayName, phone }) });
+    await fetch('/api/admin-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'profile', displayName, phone, role, department }) });
     if (displayName) {
       ctx?.setUser?.(u => ({ ...u, name: displayName }));
       setUser(u => ({ ...u, name: displayName }));
@@ -266,11 +270,19 @@ export default function AdminSettingsPage() {
                   <input style={input} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" />
                 </div>
                 <div>
+                  <label style={label}>Signature Designation / Title</label>
+                  <input style={input} value={role} onChange={e => setRole(e.target.value)} placeholder="e.g., Senior Vice President and Head" />
+                </div>
+                <div>
+                  <label style={label}>Signature Department / Subtitle</label>
+                  <input style={input} value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g., Education, Training and Assessment" />
+                </div>
+                <div>
                   <label style={label}>Email (read-only)</label>
                   <input style={{ ...input, opacity: 0.6 }} value={user?.email || ''} disabled />
                 </div>
                 <div>
-                  <label style={label}>Role (read-only)</label>
+                  <label style={label}>System Role (read-only)</label>
                   <input style={{ ...input, opacity: 0.6 }} value={user?.role || ''} disabled />
                 </div>
               </div>

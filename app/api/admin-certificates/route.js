@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { sanitizeInput, sanitizeString } from '@/lib/sanitize';
 import { logAdminAction } from '@/lib/audit';
 import { sendTaskEmail } from '@/lib/mailer';
+import crypto from 'crypto';
 
 async function requireAdmin() {
   const session = await getSession();
@@ -51,7 +52,7 @@ export async function POST(req) {
   const {
     type, category, recipientId, recipientName, recipientEmail,
     recipientDesignation, respondentName, respondentRole,
-    respondentDepartment, dateFrom, dateTo, remarks, template
+    respondentDepartment, dateFrom, dateTo, remarks, template, id
   } = body;
 
   if (!type || !recipientName || !recipientEmail || !template) {
@@ -61,8 +62,12 @@ export async function POST(req) {
   const db = await getDb();
 
   // Generate certificate ID
-  const count = await db.collection('certificates').countDocuments();
-  const certId = `CERT-${String(count + 1).padStart(5, '0')}`;
+  let certId = id;
+  if (!certId || typeof certId !== 'string' || certId.trim().length !== 16) {
+    certId = crypto.randomBytes(8).toString('hex');
+  } else {
+    certId = certId.trim().toLowerCase();
+  }
 
   const certificate = {
     id: certId,

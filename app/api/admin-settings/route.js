@@ -34,6 +34,8 @@ export async function PUT(req) {
   if (body.type === 'profile') {
     update.displayName = sanitizeString(body.displayName || '', 100);
     update.phone = sanitizeString(body.phone || '', 20);
+    update.role = sanitizeString(body.role || '', 100);
+    update.department = sanitizeString(body.department || '', 100);
 
     // Sync name to the admins collection so Admin Management, activity logs etc. stay consistent
     const newName = sanitizeString(body.displayName || '', 100);
@@ -42,7 +44,15 @@ export async function PUT(req) {
       // Match by email (session.email) or by custom id (session.id)
       await adminsCol.updateOne(
         { $or: [{ email: session.email }, { id: session.id }] },
-        { $set: { name: newName, phone: sanitizeString(body.phone || '', 20), updatedAt: new Date().toISOString() } }
+        { 
+          $set: { 
+            name: newName, 
+            phone: sanitizeString(body.phone || '', 20), 
+            role: sanitizeString(body.role || '', 100),
+            department: sanitizeString(body.department || '', 100),
+            updatedAt: new Date().toISOString() 
+          } 
+        }
       );
     }
   }

@@ -121,12 +121,13 @@ function getCertTitle(type, category) {
 // ═══════════════════════════════════════════════════════════
 // CERTIFICATE HTML TEMPLATES
 // ═══════════════════════════════════════════════════════════
-function renderCertificateHTML({ template, type, category, recipientName, recipientDesignation, recipientId, respondentName, respondentRole, respondentDepartment, dateFrom, dateTo, remarks, respondentSignature }) {
+function renderCertificateHTML({ template, type, category, recipientName, recipientDesignation, recipientId, respondentName, respondentRole, respondentDepartment, dateFrom, dateTo, remarks, respondentSignature, id, qrCode, createdAt }) {
   const title = getCertTitle(type, category);
   const body = generateCertBody({ type, category, recipientName, recipientDesignation, respondentName, dateFrom, dateTo, remarks });
   const bodyHtml = body.replace(/\n/g, '<br/>');
   const fromDate = dateFrom ? formatDateDisplay(dateFrom) : '';
   const toDate = dateTo ? formatDateDisplay(dateTo) : '';
+  const issuedDate = createdAt ? formatDateDisplay(createdAt) : formatDateDisplay(new Date());
 
   if (type === 'relieving') {
     const formattedDate = toDate || formatDateDisplay(new Date());
@@ -140,6 +141,11 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
           <div style="position: absolute; top: 12px; right: 12px; width: 16px; height: 16px; border-top: 2px solid #c29b76; border-right: 2px solid #c29b76;"></div>
           <div style="position: absolute; bottom: 12px; left: 12px; width: 16px; height: 16px; border-bottom: 2px solid #c29b76; border-left: 2px solid #c29b76;"></div>
           <div style="position: absolute; bottom: 12px; right: 12px; width: 16px; height: 16px; border-bottom: 2px solid #c29b76; border-right: 2px solid #c29b76;"></div>
+
+          <!-- Certificate Number -->
+          <div style="position: absolute; top: 20px; right: 56px; font-size: 8px; font-weight: 500; font-family: 'Inter', sans-serif; color: #7c5e3f; letter-spacing: 0.5px; opacity: 0.75;">
+            Cert No: <span style="text-transform: uppercase;">${id || ''}</span>
+          </div>
 
           <div>
             <!-- Header Letterhead -->
@@ -182,20 +188,28 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
             </div>
           </div>
 
-          <!-- Closing Sign-off -->
+          <!-- Closing Sign-off & QR -->
           <div>
-            <div style="font-size: 13px; color: #2a1f14; margin-bottom: 32px;">
-              <div style="margin-bottom: 8px;">For <strong>Cluso Infolink</strong>,</div>
-              <div style="height: 44px; display: flex; align-items: flex-end; margin-bottom: 8px;">
-                ${respondentSignature ? `
-                  <img src="${respondentSignature}" alt="Signature" style="max-height: 44px; width: auto; object-fit: contain;" />
-                ` : '<div style="height: 44px;"></div>'}
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
+              <div style="font-size: 13px; color: #2a1f14;">
+                <div style="margin-bottom: 8px;">For <strong>Cluso Infolink</strong>,</div>
+                <div style="height: 44px; display: flex; align-items: flex-end; margin-bottom: 8px;">
+                  ${respondentSignature ? `
+                    <img src="${respondentSignature}" alt="Signature" style="max-height: 44px; width: auto; object-fit: contain;" />
+                  ` : '<div style="height: 44px;"></div>'}
+                </div>
+                <div style="border-top: 1px solid #d4b896; display: inline-block; padding-top: 6px; min-width: 180px;">
+                  <strong style="color: #2a1f14;">${respondentName}</strong><br/>
+                  <span style="font-size: 11px; color: #8b7355;">${respondentRole}</span><br/>
+                  <span style="font-size: 10px; color: #b0a08e;">${respondentDepartment || 'HR Administration'}</span>
+                </div>
               </div>
-              <div style="border-top: 1px solid #d4b896; display: inline-block; padding-top: 6px; min-width: 180px;">
-                <strong style="color: #2a1f14;">${respondentName}</strong><br/>
-                <span style="font-size: 11px; color: #8b7355;">${respondentRole}</span><br/>
-                <span style="font-size: 10px; color: #b0a08e;">${respondentDepartment || 'HR Administration'}</span>
-              </div>
+              ${qrCode ? `
+                <div style="text-align: center; font-size: 8px; color: #8b7355; font-family: 'Georgia', serif;">
+                  <img src="${qrCode}" alt="Verification QR Code" style="width: 75px; height: 75px; display: block; border: 1px solid #c29b76; padding: 2px; background: #fff; margin-bottom: 4px;" />
+                  Verify Authenticity
+                </div>
+              ` : ''}
             </div>
 
             <!-- Footer border -->
@@ -212,6 +226,11 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
         <div style="font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; width: 640px; height: 900px; margin: 0 auto; padding: 48px 56px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;">
           <!-- Modern left accent bar -->
           <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, #3b82f6, #8b5cf6);"></div>
+
+          <!-- Certificate Number -->
+          <div style="position: absolute; top: 20px; right: 56px; font-size: 8px; font-weight: 500; font-family: 'Inter', sans-serif; color: #64748b; letter-spacing: 0.5px; opacity: 0.75;">
+            Cert No: <strong style="color: #0f172a; text-transform: uppercase;">${id || ''}</strong>
+          </div>
 
           <div>
             <!-- Header Letterhead -->
@@ -254,20 +273,28 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
             </div>
           </div>
 
-          <!-- Closing Sign-off -->
+          <!-- Closing Sign-off & QR -->
           <div>
-            <div style="font-size: 13px; color: #1e293b; margin-bottom: 28px;">
-              <div style="margin-bottom: 8px; color: #475569;">Sincerely,</div>
-              <div style="height: 44px; display: flex; align-items: flex-end; margin-bottom: 8px;">
-                ${respondentSignature ? `
-                  <img src="${respondentSignature}" alt="Signature" style="max-height: 44px; width: auto; object-fit: contain;" />
-                ` : '<div style="height: 44px;"></div>'}
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px;">
+              <div style="font-size: 13px; color: #1e293b;">
+                <div style="margin-bottom: 8px; color: #475569;">Sincerely,</div>
+                <div style="height: 44px; display: flex; align-items: flex-end; margin-bottom: 8px;">
+                  ${respondentSignature ? `
+                    <img src="${respondentSignature}" alt="Signature" style="max-height: 44px; width: auto; object-fit: contain;" />
+                  ` : '<div style="height: 44px;"></div>'}
+                </div>
+                <div style="border-top: 1px solid #e2e8f0; display: inline-block; padding-top: 6px; min-width: 180px;">
+                  <strong style="color: #0f172a;">${respondentName}</strong><br/>
+                  <span style="font-size: 11px; color: #64748b;">${respondentRole}</span><br/>
+                  <span style="font-size: 10px; color: #94a3b8;">${respondentDepartment || 'HR Department'}</span>
+                </div>
               </div>
-              <div style="border-top: 1px solid #e2e8f0; display: inline-block; padding-top: 6px; min-width: 180px;">
-                <strong style="color: #0f172a;">${respondentName}</strong><br/>
-                <span style="font-size: 11px; color: #64748b;">${respondentRole}</span><br/>
-                <span style="font-size: 10px; color: #94a3b8;">${respondentDepartment || 'HR Department'}</span>
-              </div>
+              ${qrCode ? `
+                <div style="text-align: center; font-size: 8px; color: #94a3b8; font-family: sans-serif;">
+                  <img src="${qrCode}" alt="Verification QR Code" style="width: 75px; height: 75px; display: block; border: 1px solid #e2e8f0; padding: 2px; background: #fff; border-radius: 4px; margin-bottom: 4px;" />
+                  Verify Authenticity
+                </div>
+              ` : ''}
             </div>
 
             <!-- Footer border -->
@@ -284,6 +311,11 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
         <div style="font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; width: 640px; height: 900px; margin: 0 auto; padding: 48px 56px; background: #ffffff; border: 1px solid #cbd5e1; border-top: 4px solid #1e1b4b; box-shadow: 0 4px 20px rgba(0,0,0,0.05); box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
           <!-- Top gold accent bar just below navy border -->
           <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #c9a84c;"></div>
+
+          <!-- Certificate Number -->
+          <div style="position: absolute; top: 20px; right: 56px; font-size: 8px; font-weight: 500; font-family: sans-serif; color: #c9a84c; letter-spacing: 0.5px; opacity: 0.75;">
+            Cert No: <strong style="color: #c9a84c; text-transform: uppercase;">${id || ''}</strong>
+          </div>
 
           <div>
             <!-- Header Letterhead -->
@@ -330,22 +362,30 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
             </div>
           </div>
 
-          <!-- Closing Sign-off -->
+          <!-- Closing Sign-off & QR -->
           <div>
-            <div style="font-size: 13px; color: #1e1b4b; margin-bottom: 24px;">
-              <div style="margin-bottom: 8px;">For <strong>Cluso Infolink</strong>,</div>
-              <div style="height: 46px; display: flex; align-items: flex-end; margin-bottom: 8px;">
-                ${respondentSignature ? `
-                  <div style="display: inline-block; background: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(201, 168, 76, 0.15); box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                    <img src="${respondentSignature}" alt="Signature" style="max-height: 38px; width: auto; display: block; object-fit: contain;" />
-                  </div>
-                ` : '<div style="height: 46px;"></div>'}
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
+              <div style="font-size: 13px; color: #1e1b4b;">
+                <div style="margin-bottom: 8px;">For <strong>Cluso Infolink</strong>,</div>
+                <div style="height: 46px; display: flex; align-items: flex-end; margin-bottom: 8px;">
+                  ${respondentSignature ? `
+                    <div style="display: inline-block; background: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(201, 168, 76, 0.15); box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                      <img src="${respondentSignature}" alt="Signature" style="max-height: 38px; width: auto; display: block; object-fit: contain;" />
+                    </div>
+                  ` : '<div style="height: 46px;"></div>'}
+                </div>
+                <div style="border-top: 1px solid #c9a84c; display: inline-block; padding-top: 6px; min-width: 180px;">
+                  <strong style="color: #1e1b4b;">${respondentName}</strong><br/>
+                  <span style="font-size: 11px; color: #c9a84c; font-weight: 500;">${respondentRole}</span><br/>
+                  <span style="font-size: 10px; color: #64748b;">${respondentDepartment || 'HR Operations'}</span>
+                </div>
               </div>
-              <div style="border-top: 1px solid #c9a84c; display: inline-block; padding-top: 6px; min-width: 180px;">
-                <strong style="color: #1e1b4b;">${respondentName}</strong><br/>
-                <span style="font-size: 11px; color: #c9a84c; font-weight: 500;">${respondentRole}</span><br/>
-                <span style="font-size: 10px; color: #64748b;">${respondentDepartment || 'HR Operations'}</span>
-              </div>
+              ${qrCode ? `
+                <div style="text-align: center; font-size: 8px; color: #c9a84c; font-family: sans-serif;">
+                  <img src="${qrCode}" alt="Verification QR Code" style="width: 75px; height: 75px; display: block; border: 1px solid rgba(201, 168, 76, 0.3); padding: 2px; background: #fff; margin-bottom: 4px;" />
+                  Verify Authenticity
+                </div>
+              ` : ''}
             </div>
 
             <!-- Footer border -->
@@ -367,6 +407,11 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
           <div style="position: absolute; top: -2px; right: -2px; width: 24px; height: 24px; border-top: 3px solid #c29b76; border-right: 3px solid #c29b76;"></div>
           <div style="position: absolute; bottom: -2px; left: -2px; width: 24px; height: 24px; border-bottom: 3px solid #c29b76; border-left: 3px solid #c29b76;"></div>
           <div style="position: absolute; bottom: -2px; right: -2px; width: 24px; height: 24px; border-bottom: 3px solid #c29b76; border-right: 3px solid #c29b76;"></div>
+
+          <!-- Certificate Number -->
+          <div style="position: absolute; top: 12px; right: 24px; font-size: 8px; font-weight: 500; font-family: 'Inter', sans-serif; color: #7c5e3f; letter-spacing: 0.5px; opacity: 0.75;">
+            Cert No: <span style="text-transform: uppercase;">${id || ''}</span>
+          </div>
 
           <!-- Header Logo (Left Aligned) -->
           <div>
@@ -400,8 +445,9 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
           <!-- Footer Signature -->
           <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 6px; margin-bottom: 4px;">
             <div style="text-align: center;">
-              ${fromDate && toDate ? `<div style="font-size: 10px; color: #8b7355; margin-bottom: 2px;">${fromDate} — ${toDate}</div>` : ''}
-              <div style="font-size: 9px; color: #b0a08e; text-transform: uppercase; letter-spacing: 1px;">Duration</div>
+              ${qrCode ? `<div style="margin-bottom: 6px; display: flex; justify-content: center;"><img src="${qrCode}" alt="Verification QR Code" style="width: 75px; height: 75px; display: block; border: 1px solid #c29b76; padding: 2px; background: #fff;" /></div>` : ''}
+              <div style="font-size: 10px; color: #8b7355; margin-bottom: 2px;">${issuedDate}</div>
+              <div style="font-size: 9px; color: #b0a08e; text-transform: uppercase; letter-spacing: 1px;">Date of Issue</div>
             </div>
             <div style="text-align: center; position: relative;">
               ${respondentSignature ? `
@@ -428,13 +474,13 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
         <div style="height: 6px; background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899); flex-shrink: 0;"></div>
 
         <div style="padding: 30px 40px 24px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
-          <!-- Header Logo (Left Aligned) -->
+          <!-- Header Logo & Cert ID -->
           <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0;">
             <div>
               <img src="${LOGO_BASE64}" alt="Cluso Infolink Logo" style="height: 36px; width: auto; object-fit: contain; display: block;" />
             </div>
-            <div style="font-size: 10px; color: #94a3b8; text-align: right; padding-top: 4px;">
-              ${fromDate && toDate ? `${fromDate} — ${toDate}` : ''}
+            <div style="font-size: 8px; font-weight: 500; font-family: sans-serif; color: #64748b; text-align: right; padding-top: 4px; opacity: 0.75;">
+              Cert No: <span style="color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">${id || ''}</span>
             </div>
           </div>
 
@@ -462,8 +508,13 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
             </div>
           </div>
 
-          <!-- Footer Signature -->
-          <div style="display: flex; justify-content: flex-end; flex-shrink: 0;">
+          <!-- Footer Signature & QR -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-shrink: 0;">
+            <div style="text-align: left;">
+              ${qrCode ? `<div style="margin-bottom: 6px;"><img src="${qrCode}" alt="Verification QR Code" style="width: 75px; height: 75px; display: block; border: 1px solid #e2e8f0; padding: 2px; background: #fff; border-radius: 4px;" /></div>` : ''}
+              <div style="font-size: 10px; color: #64748b; margin-bottom: 2px;">${issuedDate}</div>
+              <div style="font-size: 8px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px;">Date of Issue</div>
+            </div>
             <div style="text-align: right; min-width: 160px;">
               <div style="font-size: 8px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 2px;">Authorized By</div>
               ${respondentSignature ? `
@@ -488,6 +539,11 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
       <div style="font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; width: 800px; height: 600px; margin: 0 auto; padding: 0; background: #0f0f1a; border-radius: 4px; overflow: hidden; position: relative; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
         <!-- Gold top border -->
         <div style="height: 3px; background: linear-gradient(90deg, #1a1a2e, #c9a84c, #e8c86e, #c9a84c, #1a1a2e); flex-shrink: 0;"></div>
+
+        <!-- Certificate Number -->
+        <div style="position: absolute; top: 12px; right: 24px; font-size: 8px; font-weight: 500; font-family: sans-serif; color: #c9a84c; letter-spacing: 0.5px; opacity: 0.75;">
+          Cert No: <strong style="color: #e8e4dd; text-transform: uppercase;">${id || ''}</strong>
+        </div>
 
         <div style="padding: 30px 40px 24px; position: relative; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
           <!-- Background ornament -->
@@ -530,8 +586,9 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
           <!-- Footer -->
           <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(201,168,76,0.15); padding-top: 12px; flex-shrink: 0; z-index: 2;">
             <div>
-              ${fromDate && toDate ? `<div style="font-size: 10px; color: #6b665f;">${fromDate} — ${toDate}</div>` : ''}
-              <div style="font-size: 8px; color: #4a463f; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;">Duration of Service</div>
+              ${qrCode ? `<div style="margin-bottom: 6px;"><img src="${qrCode}" alt="Verification QR Code" style="width: 75px; height: 75px; display: block; border: 1px solid rgba(201,168,76,0.3); padding: 2px; background: #fff; border-radius: 2px;" /></div>` : ''}
+              <div style="font-size: 10px; color: #6b665f;">${issuedDate}</div>
+              <div style="font-size: 8px; color: #4a463f; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;">Date of Issue</div>
             </div>
             <div style="text-align: right; min-width: 160px;">
               ${respondentSignature ? `
@@ -588,6 +645,38 @@ export default function CertificatesPage() {
   const [remarks, setRemarks] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('classic');
   const [showDesignationSuggestions, setShowDesignationSuggestions] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+
+  // Auto-generate 16-digit hex verification code
+  useEffect(() => {
+    if (certType && !verificationCode) {
+      const code = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      setVerificationCode(code);
+    }
+  }, [certType, verificationCode]);
+
+  // Generate QR code data URL from verification code
+  useEffect(() => {
+    if (verificationCode) {
+      import('qrcode').then((QRCode) => {
+        QRCode.toDataURL(verificationCode, {
+          margin: 1,
+          width: 150,
+          color: {
+            dark: '#000000',
+            light: '#ffffff'
+          }
+        }).then(url => {
+          setQrCodeDataUrl(url);
+        }).catch(err => {
+          console.error('Failed to generate QR code', err);
+        });
+      });
+    } else {
+      setQrCodeDataUrl('');
+    }
+  }, [verificationCode]);
 
   // Load data
   useEffect(() => {
@@ -720,6 +809,8 @@ export default function CertificatesPage() {
     setSelectedTemplate('classic');
     setRecipientSearch('');
     setShowDesignationSuggestions(false);
+    setVerificationCode('');
+    setQrCodeDataUrl('');
   };
 
   const totalSteps = certType === 'completion' ? 7 : 6;
@@ -758,6 +849,9 @@ export default function CertificatesPage() {
     remarks,
     template: selectedTemplate,
     respondentSignature: selectedRespondent?.signature || '',
+    id: verificationCode,
+    qrCode: qrCodeDataUrl,
+    createdAt: new Date().toISOString(),
   };
 
   const certificateHtml = renderCertificateHTML(certData);
@@ -824,9 +918,27 @@ export default function CertificatesPage() {
   const handleDownloadPastCert = async (cert) => {
     // Look up signature in loaded admins list if not stored in the cert
     const signature = cert.respondentSignature || admins.find(a => a.name === cert.respondentName)?.signature || '';
+    
+    // Generate QR code for this past certificate's id (16-digit hex)
+    let qrCode = '';
+    try {
+      const QRCode = await import('qrcode');
+      qrCode = await QRCode.toDataURL(cert.id, {
+        margin: 1,
+        width: 150,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+    } catch (e) {
+      console.error('Failed to generate QR code for download', e);
+    }
+
     const certDataForRender = {
       ...cert,
-      respondentSignature: signature
+      respondentSignature: signature,
+      qrCode: qrCode
     };
     
     setDownloadingCert(certDataForRender);
@@ -1226,34 +1338,43 @@ export default function CertificatesPage() {
                             {selectedRespondent.signature ? 'Change Signature' : 'Upload Signature'}
                             <input 
                               type="file" 
-                              accept="image/*" 
-                              onChange={(e) => {
+                              accept="image/png,image/jpeg,image/jpg,image/webp" 
+                              onChange={async (e) => {
                                 const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = async (event) => {
-                                    const base64 = event.target?.result;
-                                    if (base64) {
-                                      try {
-                                        const res = await fetch('/api/admin-admins/signature', {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ id: selectedRespondent.id, signature: base64 })
-                                        });
-                                        if (res.ok) {
-                                          showMsg('Signature uploaded and saved successfully.');
-                                          setSelectedRespondent(prev => ({ ...prev, signature: base64 }));
-                                          setAdmins(prev => prev.map(a => a.id === selectedRespondent.id ? { ...a, signature: base64 } : a));
-                                        } else {
-                                          showMsg('Failed to save signature.', true);
-                                        }
-                                      } catch (err) {
-                                        showMsg('Error uploading signature.', true);
-                                      }
-                                    }
-                                  };
-                                  reader.readAsDataURL(file);
+                                if (!file) return;
+                                // Reset file input so the same file can be re-selected
+                                e.target.value = '';
+                                
+                                // Validate file size (max 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  showMsg('Signature image is too large. Please use a smaller image (max 5MB).', true);
+                                  return;
                                 }
+                                
+                                const reader = new FileReader();
+                                reader.onload = async (event) => {
+                                  const base64 = event.target?.result;
+                                  if (base64) {
+                                    try {
+                                      const res = await fetch('/api/admin-admins/signature', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ id: selectedRespondent.id, signature: base64 })
+                                      });
+                                      const data = await res.json();
+                                      if (res.ok) {
+                                        showMsg('Signature uploaded and saved successfully.');
+                                        setSelectedRespondent(prev => ({ ...prev, signature: base64 }));
+                                        setAdmins(prev => prev.map(a => a.id === selectedRespondent.id ? { ...a, signature: base64 } : a));
+                                      } else {
+                                        showMsg(data.error || 'Failed to save signature.', true);
+                                      }
+                                    } catch (err) {
+                                      showMsg('Error uploading signature. Please try again.', true);
+                                    }
+                                  }
+                                };
+                                reader.readAsDataURL(file);
                               }}
                               style={{ display: 'none' }} 
                             />
