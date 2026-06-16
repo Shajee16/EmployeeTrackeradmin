@@ -337,7 +337,7 @@ export default function TaskManagement() {
                   top: '105%',
                   left: 0,
                   right: 0,
-                  background: 'var(--surface-overlay)',
+                  background: 'var(--surface, #ffffff)',
                   border: '1.5px solid var(--surface-border)',
                   borderRadius: 12,
                   boxShadow: 'var(--shadow-md)',
