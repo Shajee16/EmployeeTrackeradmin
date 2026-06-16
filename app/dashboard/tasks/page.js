@@ -844,6 +844,12 @@ export default function TaskManagement() {
                   <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Created At</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{viewModal.createdAt ? new Date(viewModal.createdAt).toLocaleDateString() : '-'}</div>
                 </div>
+                <div style={{ padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Created By</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={viewModal.createdBy || (viewModal.statusLogs && viewModal.statusLogs[0]?.userName) || 'Admin'}>
+                    {viewModal.createdBy || (viewModal.statusLogs && viewModal.statusLogs[0]?.userName) || 'Admin'}
+                  </div>
+                </div>
               </div>
 
               {/* Task Timer / Time Limit display */}

@@ -107,6 +107,7 @@ export async function POST(req) {
       comments: [],
       completionProof: null,
       createdAt: new Date().toISOString(),
+      createdBy: session.name || session.email || 'Admin',
       hasAttachment: false,
       attachmentName: null,
       timeLimitHours: timeLimitHours && !isNaN(timeLimitHours) ? timeLimitHours : null,
