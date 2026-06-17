@@ -254,6 +254,7 @@ function DashboardLayoutInner({ children }) {
         <AnimatePresence>
           {mobileOpen && (
             <motion.div
+              key="mobile-overlay"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
               style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 40 }}
@@ -261,6 +262,8 @@ function DashboardLayoutInner({ children }) {
           )}
           {hoveredTab && (
             <motion.div
+              key="sidebar-tooltip"
+              className="sidebar-tooltip"
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 5 }}
@@ -989,6 +992,7 @@ function DashboardLayoutInner({ children }) {
           .content-area { padding: 16px 12px !important; }
           .search-bar { width: 180px !important; }
           .collapse-toggle-wrap { display: none !important; }
+          .sidebar-tooltip { display: none !important; }
         }
         @media (max-width: 480px) {
           .search-bar { display: none !important; }

@@ -572,7 +572,7 @@ export default function TaskManagement() {
             </div>
             <div style={{ gridColumn: 'span 2' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Description</label>
-              <textarea rows={3} value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Task details..." />
+              <textarea rows={8} value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Task details..." style={{ minHeight: '180px' }} />
             </div>
 
             {/* Attachment Section */}
@@ -1098,11 +1098,11 @@ export default function TaskManagement() {
                 <div style={{ gridColumn: 'span 2' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Description</label>
                   <textarea 
-                    rows={3} 
+                    rows={8} 
                     value={editForm.description} 
                     onChange={e => setEditForm({...editForm, description: e.target.value})} 
                     placeholder="Task details..." 
-                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 12, fontSize: '0.9rem', color: 'var(--text)', outline: 'none', resize: 'vertical' }}
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)', border: '1.5px solid var(--surface-border)', borderRadius: 12, fontSize: '0.9rem', color: 'var(--text)', outline: 'none', resize: 'vertical', minHeight: '180px' }}
                   />
                 </div>
 

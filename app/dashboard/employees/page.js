@@ -47,6 +47,7 @@ export default function EmployeesPage() {
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [expandedDepts, setExpandedDepts] = useState({});
   const [detailModal, setDetailModal] = useState(null);
+  const [employeeDetailModal, setEmployeeDetailModal] = useState(null);
   const [activityDateFilter, setActivityDateFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -366,14 +367,26 @@ export default function EmployeesPage() {
               <AnimatePresence initial={false}>
                 {expandedDepts[dept] && (
                   <motion.div key={`dept-content-${dept}`} initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <tbody>
+                    <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <tbody className="responsive-tbody">
                         {emps.map(e => {
                           const isOnline = !!onlineMap[e.id];
                           const onlineInfo = onlineMap[e.id];
                           return (
-                          <tr key={e.id} style={{ borderBottom: '1px solid var(--surface-border)', opacity: e.deactivated ? 0.45 : (e.status === 'away' ? 0.6 : 1) }}>
-                            <td style={{ padding: '16px 20px', verticalAlign: 'middle' }}>
+                          <tr 
+                            key={e.id} 
+                            className="responsive-row"
+                            style={{ 
+                              borderBottom: '1px solid var(--surface-border)', 
+                              opacity: e.deactivated ? 0.45 : (e.status === 'away' ? 0.6 : 1),
+                              cursor: 'pointer',
+                              transition: 'background 0.2s'
+                            }}
+                            onClick={() => setEmployeeDetailModal(e)}
+                            onMouseEnter={ev => ev.currentTarget.style.background = 'var(--bg-secondary)'}
+                            onMouseLeave={ev => ev.currentTarget.style.background = 'transparent'}
+                          >
+                            <td className="responsive-cell" style={{ padding: '16px 20px', verticalAlign: 'middle' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 {/* Online indicator dot */}
                                 <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -394,47 +407,27 @@ export default function EmployeesPage() {
                                 </div>
                                 <div>
                                   <div style={{ fontWeight: 600, fontSize: '1rem' }}>{e.name}</div>
-                                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{e.id ? <span style={{fontWeight: 600}}>{e.id}</span> : ''} {e.id ? '•' : ''} {e.email}</div>
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                                    {targetMap[e.id] && (
-                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
-                                        <Target size={10} /> Target: ₹{Number(targetMap[e.id].monthlyTarget).toLocaleString('en-IN')}
-                                      </div>
-                                    )}
-                                    {digilockerMap[e.id] && digilockerMap[e.id].verified ? (
-                                      <div
-                                        style={{
-                                          display: 'inline-flex', alignItems: 'center', gap: 5,
-                                          padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700,
-                                          background: 'rgba(5,150,105,0.08)', color: '#059669',
-                                          border: '1px solid rgba(5,150,105,0.2)',
-                                          cursor: 'pointer', transition: 'all 0.2s',
-                                        }}
-                                        onClick={(ev) => { ev.stopPropagation(); viewDigilocker(e); }}
-                                        title="Click to view DigiLocker details"
-                                      >
-                                        <ShieldCheck size={11} />
-                                        DigiLocker Verified
-                                      </div>
-                                    ) : (
-                                      <div
-                                        style={{
-                                          display: 'inline-flex', alignItems: 'center', gap: 5,
-                                          padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600,
-                                          background: 'rgba(107,114,128,0.06)', color: '#9ca3af',
-                                          border: '1px solid rgba(107,114,128,0.12)',
-                                        }}
-                                      >
-                                        <ShieldX size={11} />
-                                        Not Verified
-                                      </div>
-                                    )}
+                                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                    {e.id ? <span style={{fontWeight: 600}}>{e.id}</span> : ''} {e.id ? '•' : ''} {e.email}
                                   </div>
+                                  {digilockerMap[e.id] && digilockerMap[e.id].verified ? (
+                                    <div 
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, padding: '2px 8px', borderRadius: 10, fontSize: '0.72rem', fontWeight: 700, background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1px solid rgba(5,150,105,0.15)', cursor: 'pointer' }}
+                                      onClick={(ev) => { ev.stopPropagation(); viewDigilocker(e); }}
+                                      title="Click to view DigiLocker details"
+                                    >
+                                      <ShieldCheck size={11} /> DigiLocker Verified
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, padding: '2px 8px', borderRadius: 10, fontSize: '0.72rem', fontWeight: 600, background: 'rgba(107,114,128,0.05)', color: '#9ca3af', border: '1px solid rgba(107,114,128,0.1)' }}>
+                                      <ShieldX size={11} /> Not Verified
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </td>
-                            <td style={{ padding: '16px 20px', color: 'var(--text-muted)', verticalAlign: 'middle' }}>{e.designation || e.role}</td>
-                            <td style={{ padding: '16px 20px', verticalAlign: 'middle' }}>
+                            <td className="responsive-cell" style={{ padding: '16px 20px', color: 'var(--text-muted)', verticalAlign: 'middle' }}>{e.designation || e.role}</td>
+                            <td className="responsive-cell" style={{ padding: '16px 20px', verticalAlign: 'middle' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 {e.deactivated ? (
                                   <span className="badge badge-danger" style={{ background: '#ef4444', color: '#fff', width: 'fit-content' }}>Deactivated</span>
@@ -458,47 +451,6 @@ export default function EmployeesPage() {
                                     since {new Date(onlineInfo.loginTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                 )}
-                              </div>
-                            </td>
-                            <td style={{ padding: '16px 20px', textAlign: 'right', verticalAlign: 'middle' }}>
-                              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
-                                <button className="btn btn-primary" style={{ padding: '6px 12px' }} onClick={() => viewActivity(e)}>
-                                  <Activity size={16} /> View Activity
-                                </button>
-                                <button className="btn btn-outline" style={{ padding: '6px 12px' }} onClick={() => { setEditModal(e); setEditForm({...e, newPassword: ''}); }}>
-                                  <Edit size={16} /> Edit
-                                </button>
-                                <button className="btn btn-outline" style={{ padding: '6px 12px', color: targetMap[e.id] ? '#10b981' : 'var(--text-muted)' }} onClick={() => { setTargetModal(e); setTargetAmount(targetMap[e.id]?.monthlyTarget || ''); }} title="Set Revenue Target">
-                                  <Target size={16} />
-                                </button>
-                                <button className="btn btn-outline" style={{ padding: '6px 12px', color: e.hideFromLeaderboard ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => toggleLeaderboard(e.id, !e.hideFromLeaderboard)} title={e.hideFromLeaderboard ? "Show on Leaderboard" : "Hide from Leaderboard"}>
-                                  {e.hideFromLeaderboard ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
-                                <button 
-                                  className="btn btn-outline" 
-                                  style={{ padding: '6px 12px', color: e.deactivated ? '#10b981' : '#ef4444', borderColor: e.deactivated ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)' }} 
-                                  onClick={() => toggleDeactivation(e.id, e.deactivated, e.name)} 
-                                  title={e.deactivated ? "Activate Employee" : "Deactivate Employee"}
-                                >
-                                  {e.deactivated ? <Unlock size={16} /> : <Lock size={16} />}
-                                </button>
-                                 {user?.role === 'Super Admin' && (
-                                   digilockerMap[e.id]?.verified ? (
-                                     <button 
-                                       className="btn btn-outline" 
-                                       style={{ padding: '6px 12px', color: '#dc2626', borderColor: 'rgba(220, 38, 38, 0.25)' }} 
-                                       onClick={() => unlinkDigilocker(e.id, e.name)}
-                                       title="Unlink DigiLocker Verification"
-                                     >
-                                       <Link2Off size={16} />
-                                     </button>
-                                   ) : (
-                                     <div style={{ width: 42, height: 32, flexShrink: 0 }} />
-                                   )
-                                 )}
-                                <button className="btn btn-danger" style={{ padding: '6px 12px' }} onClick={() => confirmDelete(e.id, e.name)}>
-                                  <UserX size={16} />
-                                </button>
                               </div>
                             </td>
                           </tr>
@@ -1186,7 +1138,239 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {/* Keyframe animations for online status indicators */}
+      {/* ═══════ EMPLOYEE PROFILE DETAIL MODAL ═══════ */}
+      {employeeDetailModal && (
+        <div 
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 95, padding: 16 }} 
+          onClick={() => setEmployeeDetailModal(null)}
+        >
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            className="card" 
+            style={{ width: 650, maxWidth: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', overflow: 'hidden', padding: 0 }} 
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)' }}>
+              <div>
+                <h3 style={{ fontWeight: 800, fontSize: '1.25rem', margin: 0 }}>Employee Profile</h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>All details and administrative actions</p>
+              </div>
+              <button onClick={() => setEmployeeDetailModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="var(--text-muted)" /></button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div style={{ padding: 24, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Profile Card Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--surface-border)' }}>
+                <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, var(--primary-light, #c29b76), var(--primary, #a67c52))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '1.2rem', flexShrink: 0 }}>
+                  {employeeDetailModal.name?.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text)' }}>{employeeDetailModal.name}</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 2 }}>{employeeDetailModal.id || 'N/A'} · {employeeDetailModal.designation || employeeDetailModal.role}</div>
+                </div>
+              </div>
+
+              {/* Personal & Work details grid */}
+              <div>
+                <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Personal & Work Information</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, background: 'var(--surface)', padding: 16, borderRadius: 12, border: '1px solid var(--surface-border)' }}>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Email Address</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem', wordBreak: 'break-all' }}>{employeeDetailModal.email}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Phone Number</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{employeeDetailModal.phone || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Date of Birth</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{formatDob(employeeDetailModal.dob) || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Department</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{employeeDetailModal.department || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Designation / System Role</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{employeeDetailModal.designation || employeeDetailModal.role}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Joining Date</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                      {employeeDetailModal.joinedAt || employeeDetailModal.createdAt 
+                        ? new Date(employeeDetailModal.joinedAt || employeeDetailModal.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status and Targets Section */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {/* Status Column */}
+                <div>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Account Status</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface)', padding: 16, borderRadius: 12, border: '1px solid var(--surface-border)', height: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>System Status:</span>
+                      {employeeDetailModal.deactivated ? (
+                        <span className="badge badge-danger" style={{ background: '#ef4444', color: '#fff' }}>Deactivated</span>
+                      ) : (
+                        <span className={`badge ${employeeDetailModal.status === 'away' ? 'badge-warning' : 'badge-success'}`}>{employeeDetailModal.status === 'away' ? 'Away' : 'Active'}</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Online Indicator:</span>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '3px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700,
+                        background: !!onlineMap[employeeDetailModal.id] ? 'rgba(34,197,94,0.12)' : 'rgba(107,114,128,0.1)',
+                        color: !!onlineMap[employeeDetailModal.id] ? '#22c55e' : '#6b7280',
+                        border: `1px solid ${!!onlineMap[employeeDetailModal.id] ? 'rgba(34,197,94,0.25)' : 'rgba(107,114,128,0.15)'}`,
+                        letterSpacing: '0.02em',
+                      }}>
+                        {!!onlineMap[employeeDetailModal.id] ? <Wifi size={11} /> : <WifiOff size={11} />}
+                        {!!onlineMap[employeeDetailModal.id] ? 'Online' : 'Offline'}
+                      </span>
+                    </div>
+                    {!!onlineMap[employeeDetailModal.id] && onlineMap[employeeDetailModal.id] && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'right', marginTop: 2 }}>
+                        Active since {new Date(onlineMap[employeeDetailModal.id].loginTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Targets & Verification Column */}
+                <div>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Targets & Verification</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--surface)', padding: 16, borderRadius: 12, border: '1px solid var(--surface-border)', height: '100%' }}>
+                    {/* Revenue Target */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Monthly Target</span>
+                        <span style={{ fontWeight: 700, color: targetMap[employeeDetailModal.id] ? '#10b981' : 'var(--text-muted)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Target size={12} />
+                          {targetMap[employeeDetailModal.id] ? `₹${Number(targetMap[employeeDetailModal.id].monthlyTarget).toLocaleString('en-IN')}` : 'No target set'}
+                        </span>
+                      </div>
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ padding: '4px 10px', fontSize: '0.75rem' }} 
+                        onClick={() => { setTargetModal(employeeDetailModal); setTargetAmount(targetMap[employeeDetailModal.id]?.monthlyTarget || ''); setEmployeeDetailModal(null); }}
+                      >
+                        Set
+                      </button>
+                    </div>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--surface-border)', margin: '4px 0' }} />
+
+                    {/* DigiLocker */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>DigiLocker Status</span>
+                        {digilockerMap[employeeDetailModal.id] && digilockerMap[employeeDetailModal.id].verified ? (
+                          <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <ShieldCheck size={12} /> Verified
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.78rem', color: '#9ca3af', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <ShieldX size={12} /> Not Verified
+                          </span>
+                        )}
+                      </div>
+                      {digilockerMap[employeeDetailModal.id] && digilockerMap[employeeDetailModal.id].verified && (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button 
+                            className="btn btn-outline" 
+                            style={{ padding: '4px 10px', fontSize: '0.75rem' }} 
+                            onClick={() => { viewDigilocker(employeeDetailModal); setEmployeeDetailModal(null); }}
+                          >
+                            View
+                          </button>
+                          {user?.role === 'Super Admin' && (
+                            <button 
+                              className="btn btn-outline" 
+                              style={{ padding: '4px 6px', color: '#dc2626', borderColor: 'rgba(220,38,38,0.2)' }} 
+                              onClick={() => { unlinkDigilocker(employeeDetailModal.id, employeeDetailModal.name); setEmployeeDetailModal(null); }}
+                              title="Unlink DigiLocker"
+                            >
+                              <Link2Off size={12} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Administrative Actions */}
+              <div>
+                <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Administrative Actions</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, background: 'var(--surface)', padding: 16, borderRadius: 12, border: '1px solid var(--surface-border)' }}>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ flex: '1 1 180px', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} 
+                    onClick={() => { viewActivity(employeeDetailModal); setEmployeeDetailModal(null); }}
+                  >
+                    <Activity size={16} /> View Activity Logs
+                  </button>
+                  <button 
+                    className="btn btn-outline" 
+                    style={{ flex: '1 1 180px', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} 
+                    onClick={() => { setEditModal(employeeDetailModal); setEditForm({...employeeDetailModal, newPassword: ''}); setEmployeeDetailModal(null); }}
+                  >
+                    <Edit size={16} /> Edit Employee Profile
+                  </button>
+                  <button 
+                    className="btn btn-outline" 
+                    style={{ flex: '1 1 180px', padding: '10px 16px', color: employeeDetailModal.hideFromLeaderboard ? '#f59e0b' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} 
+                    onClick={() => {
+                      toggleLeaderboard(employeeDetailModal.id, !employeeDetailModal.hideFromLeaderboard);
+                      setEmployeeDetailModal(prev => ({ ...prev, hideFromLeaderboard: !prev.hideFromLeaderboard }));
+                    }}
+                  >
+                    {employeeDetailModal.hideFromLeaderboard ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {employeeDetailModal.hideFromLeaderboard ? 'Show on Leaderboard' : 'Hide from Leaderboard'}
+                  </button>
+                  <button 
+                    className="btn btn-outline" 
+                    style={{ flex: '1 1 180px', padding: '10px 16px', color: employeeDetailModal.deactivated ? '#10b981' : '#ef4444', borderColor: employeeDetailModal.deactivated ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} 
+                    onClick={() => { toggleDeactivation(employeeDetailModal.id, employeeDetailModal.deactivated, employeeDetailModal.name); setEmployeeDetailModal(null); }}
+                  >
+                    {employeeDetailModal.deactivated ? <Unlock size={16} /> : <Lock size={16} />}
+                    {employeeDetailModal.deactivated ? 'Activate Account' : 'Deactivate Account'}
+                  </button>
+                  <button 
+                    className="btn btn-danger" 
+                    style={{ flex: '1 1 100%', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} 
+                    onClick={() => { confirmDelete(employeeDetailModal.id, employeeDetailModal.name); setEmployeeDetailModal(null); }}
+                  >
+                    <UserX size={16} /> Remove Employee Permanent
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', background: 'var(--bg-secondary)' }}>
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                onClick={() => setEmployeeDetailModal(null)}
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Keyframe animations and responsive layouts */}
       <style>{`
         @keyframes online-ring {
           0% { transform: scale(1); opacity: 1; }
@@ -1196,6 +1380,47 @@ export default function EmployeesPage() {
         @keyframes pulse-dot {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 768px) {
+          .responsive-table {
+            display: block !important;
+            width: 100% !important;
+          }
+          .responsive-tbody {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+            gap: 12px !important;
+            padding: 12px 4px !important;
+            box-sizing: border-box !important;
+          }
+          .responsive-row {
+            display: flex !important;
+            flex-direction: column !important;
+            background: var(--surface) !important;
+            border: 1px solid var(--surface-border) !important;
+            border-radius: var(--radius-md, 14px) !important;
+            padding: 16px !important;
+            gap: 10px !important;
+            align-items: stretch !important;
+            justify-content: space-between !important;
+            box-shadow: var(--shadow-sm) !important;
+            opacity: 1 !important;
+            transition: all 0.2s ease !important;
+          }
+          .responsive-row:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: var(--shadow-md) !important;
+            border-color: var(--primary-light) !important;
+            background: var(--surface-hover) !important;
+          }
+          .responsive-cell {
+            display: block !important;
+            padding: 0 !important;
+            border: none !important;
+            width: 100% !important;
+            text-align: left !important;
+          }
         }
       `}</style>
     </motion.div>

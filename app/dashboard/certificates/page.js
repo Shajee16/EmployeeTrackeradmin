@@ -639,6 +639,7 @@ export default function CertificatesPage() {
   const [certCategory, setCertCategory] = useState('');
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [selectedRespondent, setSelectedRespondent] = useState(null);
+  const [customRespondentRole, setCustomRespondentRole] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState(() => formatDateForInput(new Date()));
   const [designation, setDesignation] = useState('');
@@ -791,6 +792,15 @@ export default function CertificatesPage() {
     }
   }, [selectedRecipient]);
 
+  // Auto-fill custom respondent designation when selected respondent changes
+  useEffect(() => {
+    if (selectedRespondent) {
+      setCustomRespondentRole(selectedRespondent.role || '');
+    } else {
+      setCustomRespondentRole('');
+    }
+  }, [selectedRespondent]);
+
   const showMsg = (msg, isError = false) => {
     if (isError) { setError(msg); setTimeout(() => setError(''), 5000); }
     else { setSuccess(msg); setTimeout(() => setSuccess(''), 5000); }
@@ -802,6 +812,7 @@ export default function CertificatesPage() {
     setCertCategory('');
     setSelectedRecipient(null);
     setSelectedRespondent(null);
+    setCustomRespondentRole('');
     setDateFrom('');
     setDateTo(formatDateForInput(new Date()));
     setDesignation('');
@@ -842,7 +853,7 @@ export default function CertificatesPage() {
     recipientId: selectedRecipient?.id || '',
     recipientDesignation: designation,
     respondentName: selectedRespondent?.name || '',
-    respondentRole: selectedRespondent?.role || '',
+    respondentRole: customRespondentRole || selectedRespondent?.role || '',
     respondentDepartment: selectedRespondent?.department || '',
     dateFrom,
     dateTo,
@@ -1382,6 +1393,77 @@ export default function CertificatesPage() {
                           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>PNG or JPG with light background recommended</p>
                         </div>
                       </div>
+
+                      <div className="card" style={{ padding: '20px', marginBottom: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)' }}>
+                        <h4 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: 700 }}>Respondent Designation / Title</h4>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 12px' }}>
+                          Choose the designation to print under the signature on the certificate (defaults to respondent's system role).
+                        </p>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div>
+                            <label className="form-label" style={{ marginBottom: 6 }}>Select Title</label>
+                            <select
+                              value={
+                                [
+                                  selectedRespondent.role,
+                                  "Product Manager",
+                                  "Project Head",
+                                  "Team Lead",
+                                  "HR Manager",
+                                  "Operations Head",
+                                  "Managing Director",
+                                  "Founder",
+                                  "Co-Founder",
+                                  "Chief Executive Officer",
+                                  "Director"
+                                ].includes(customRespondentRole) 
+                                  ? customRespondentRole 
+                                  : "other"
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === "other") {
+                                  setCustomRespondentRole("");
+                                } else {
+                                  setCustomRespondentRole(val);
+                                }
+                              }}
+                              style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface)', fontSize: '0.88rem', height: '42px', outline: 'none' }}
+                            >
+                              {[
+                                selectedRespondent.role,
+                                "Product Manager",
+                                "Project Head",
+                                "Team Lead",
+                                "HR Manager",
+                                "Operations Head",
+                                "Managing Director",
+                                "Founder",
+                                "Co-Founder",
+                                "Chief Executive Officer",
+                                "Director"
+                              ].filter((value, index, self) => self.indexOf(value) === index).map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt === selectedRespondent.role ? `${opt} (System Default)` : opt}
+                                </option>
+                              ))}
+                              <option value="other">Custom Designation...</option>
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label className="form-label" style={{ marginBottom: 6 }}>Custom Designation Text</label>
+                            <input
+                              type="text"
+                              value={customRespondentRole}
+                              onChange={(e) => setCustomRespondentRole(e.target.value)}
+                              placeholder="Type custom designation title..."
+                              style={{ width: '100%', height: '42px', boxSizing: 'border-box' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </>
                   )}
 
@@ -1646,7 +1728,7 @@ export default function CertificatesPage() {
                   {/* Info Summary */}
                   <div className="card" style={{ padding: 24, marginBottom: 24 }}>
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>Certificate Details</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
                       <div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Type</div>
                         <div style={{ fontWeight: 600 }}>{CERT_TYPES.find(t => t.key === certType)?.label}</div>
@@ -1661,7 +1743,7 @@ export default function CertificatesPage() {
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Recipient</div>
                         <div style={{ fontWeight: 600 }}>{selectedRecipient?.name}</div>
                       </div>
-                      <div>
+                      <div style={{ wordBreak: 'break-all' }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Email</div>
                         <div style={{ fontWeight: 600 }}>{selectedRecipient?.email}</div>
                       </div>
