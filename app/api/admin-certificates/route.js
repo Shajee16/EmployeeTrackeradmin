@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getDb } from '@/lib/db';
+import { getDb, getWebsiteDb } from '@/lib/db';
 import { sanitizeInput, sanitizeString } from '@/lib/sanitize';
 import { logAdminAction } from '@/lib/audit';
 import { sendTaskEmail } from '@/lib/mailer';
@@ -52,7 +52,7 @@ export async function POST(req) {
   const {
     type, category, recipientId, recipientName, recipientEmail,
     recipientDesignation, respondentName, respondentRole,
-    respondentDepartment, dateFrom, dateTo, remarks, template, id
+    respondentDepartment, dateFrom, dateTo, remarks, template, id, companyName
   } = body;
 
   if (!type || !recipientName || !recipientEmail || !template) {
@@ -71,6 +71,7 @@ export async function POST(req) {
 
   const certificate = {
     id: certId,
+    companyName: sanitizeString(companyName || 'Cluso Infolink', 100),
     type: sanitizeString(type, 50),
     category: sanitizeString(category || '', 50),
     recipientId: sanitizeString(recipientId || '', 50),
@@ -93,6 +94,40 @@ export async function POST(req) {
 
   await db.collection('certificates').insertOne(certificate);
 
+  // Sync lightweight certificate details (metadata) to the cluso.in website database
+  try {
+    const websiteDb = await getWebsiteDb();
+    const websiteCertificate = {
+      id: certificate.id,
+      companyName: certificate.companyName,
+      type: certificate.type,
+      category: certificate.category,
+      recipientId: certificate.recipientId,
+      recipientName: certificate.recipientName,
+      recipientEmail: certificate.recipientEmail,
+      recipientDesignation: certificate.recipientDesignation,
+      respondentName: certificate.respondentName,
+      respondentRole: certificate.respondentRole,
+      respondentDepartment: certificate.respondentDepartment,
+      dateFrom: certificate.dateFrom,
+      dateTo: certificate.dateTo,
+      remarks: certificate.remarks,
+      template: certificate.template,
+      createdAt: certificate.createdAt,
+      createdBy: certificate.createdBy,
+    };
+    
+    // Upsert into the website database 'certificates' collection
+    await websiteDb.collection('certificates').updateOne(
+      { id: certificate.id },
+      { $set: websiteCertificate },
+      { upsert: true }
+    );
+  } catch (syncErr) {
+    console.error('Failed to sync certificate details to ClusoWebsite database:', syncErr);
+    // Do not fail the request if website sync fails (resilient pattern)
+  }
+
   // Audit log
   await logAdminAction(auth.session, 'CREATE_CERTIFICATE', 'certificate', certId, {
     recipientName: certificate.recipientName,
@@ -112,13 +147,13 @@ export async function POST(req) {
             </h2>
           </div>
           <p>Dear ${certificate.recipientName},</p>
-          <p>We are pleased to present you with your official <strong>${emailTitle}</strong> from Cluso Infolink.</p>
+          <p>We are pleased to present you with your official <strong>${emailTitle}</strong> from ${certificate.companyName}.</p>
           <p>During your time with us as ${'aeiou'.includes((certificate.recipientDesignation || 'team member').charAt(0).toLowerCase()) ? 'an' : 'a'} <strong>${certificate.recipientDesignation || 'team member'}</strong>, we greatly valued your dedication, efforts, and valuable contributions to the organization.</p>
           <p>We have generated your ${type === 'relieving' ? 'relieving letter' : 'certificate'} as an official document. Please find the high-quality **PDF ${type === 'relieving' ? 'document' : 'certificate'} attached** directly to this email.</p>
           <p>Thank you once again, and we wish you the very best in all your future professional achievements and endeavors.</p>
           <div style="margin-top: 28px; border-top: 1px solid #edf2f7; padding-top: 16px;">
             <p style="margin: 0 0 4px; color: #718096; font-size: 0.85rem;">Best regards,</p>
-            <p style="margin: 0; font-weight: 700; color: #2d3748;">Cluso Infolink Management</p>
+            <p style="margin: 0; font-weight: 700; color: #2d3748;">${certificate.companyName} Management</p>
           </div>
         </div>
       `;
@@ -132,7 +167,7 @@ export async function POST(req) {
       const emailResult = await sendTaskEmail({
         to: certificate.recipientEmail,
         toName: certificate.recipientName,
-        subject: `Your ${emailTitle} — Cluso Infolink`,
+        subject: `Your ${emailTitle} — ${certificate.companyName}`,
         htmlBody: emailHtmlBody,
         attachment
       });
