@@ -968,7 +968,8 @@ export default function CertificatesPage() {
     let qrCode = '';
     try {
       const QRCode = await import('qrcode');
-      qrCode = await QRCode.toDataURL(`https://www.cluso.in/verify?id=${cert.id}`, {
+      const qrUrl = cert.id.startsWith('http://') || cert.id.startsWith('https://') ? cert.id : `https://www.cluso.in/verify?id=${cert.id}`;
+      qrCode = await QRCode.toDataURL(qrUrl, {
         margin: 1,
         width: 150,
         color: {
