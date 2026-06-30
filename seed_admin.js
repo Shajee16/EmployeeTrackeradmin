@@ -10,22 +10,41 @@ async function seed() {
   const db = client.db('cluso');
   
   const adminsCol = db.collection('admins');
-  const existing = await adminsCol.findOne({ email: 'pkumar@cluso.in' });
-  if (!existing) {
-    const password = await bcrypt.hash('Cluso@2026', 10);
-    await adminsCol.insertOne({
-      id: 'superadmin-001',
-      name: 'P Kumar',
-      email: 'pkumar@cluso.in',
-      password: password,
-      role: 'Super Admin',
-      status: 'active',
-      createdAt: new Date().toISOString()
-    });
-    console.log('Seeded pkumar@cluso.in');
-  } else {
-    console.log('pkumar@cluso.in already exists');
-  }
+
+  // Delete ALL existing CRM admins
+  const deleteResult = await adminsCol.deleteMany({});
+  console.log(`Deleted ${deleteResult.deletedCount} existing admin(s) from 'admins' collection.`);
+
+  const passwordHash = await bcrypt.hash('Cluso@2026', 10);
+
+  // Create pkumar@cluso.in
+  await adminsCol.insertOne({
+    id: 'superadmin-001',
+    name: 'P Kumar',
+    email: 'pkumar@cluso.in',
+    password: passwordHash,
+    role: 'Super Admin',
+    status: 'active',
+    createdAt: new Date().toISOString()
+  });
+  console.log('Created: pkumar@cluso.in (Super Admin)');
+
+  // Create indiaops@cluso.in
+  await adminsCol.insertOne({
+    id: 'superadmin-002',
+    name: 'India Ops',
+    email: 'indiaops@cluso.in',
+    password: passwordHash,
+    role: 'Super Admin',
+    status: 'active',
+    createdAt: new Date().toISOString()
+  });
+  console.log('Created: indiaops@cluso.in (Super Admin)');
+
+  console.log('\n--- CRM Admin Credentials ---');
+  console.log('Email: pkumar@cluso.in   | Password: Cluso@2026');
+  console.log('Email: indiaops@cluso.in | Password: Cluso@2026');
+
   await client.close();
 }
 

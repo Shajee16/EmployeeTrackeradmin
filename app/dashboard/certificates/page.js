@@ -664,7 +664,7 @@ export default function CertificatesPage() {
   useEffect(() => {
     if (verificationCode) {
       import('qrcode').then((QRCode) => {
-        QRCode.toDataURL(verificationCode, {
+        QRCode.toDataURL(`https://www.cluso.in/verify?id=${verificationCode}`, {
           margin: 1,
           width: 150,
           color: {
@@ -968,7 +968,7 @@ export default function CertificatesPage() {
     let qrCode = '';
     try {
       const QRCode = await import('qrcode');
-      qrCode = await QRCode.toDataURL(cert.id, {
+      qrCode = await QRCode.toDataURL(`https://www.cluso.in/verify?id=${cert.id}`, {
         margin: 1,
         width: 150,
         color: {
