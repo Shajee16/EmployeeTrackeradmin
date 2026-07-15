@@ -245,6 +245,9 @@ export async function POST(req, { params }) {
         dl_no: dlProfile.drivingLicence || null,
         photo: dlProfile.photo || null,
         documents: dlProfile.documents || null,
+        rawTokenResponse: dlProfile.rawTokenResponse || null,
+        rawUserResponse: dlProfile.rawUserResponse || null,
+        rawDocumentsResponse: dlProfile.rawDocumentsResponse || null,
         verifiedAt: dlProfile.linkedAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

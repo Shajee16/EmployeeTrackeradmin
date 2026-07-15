@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Target, ShieldCheck, ShieldX, Link2Off, Lock, Unlock } from 'lucide-react';
+import { Search, UserX, UserPlus, Edit, Eye, EyeOff, X, Check, Activity, ChevronDown, ChevronUp, Wifi, WifiOff, Target, ShieldCheck, ShieldX, Link2Off, Lock, Unlock, Download, FileText } from 'lucide-react';
 import { useTheme } from '../layout';
 
 const formatDob = (dob) => {
@@ -1083,22 +1083,79 @@ export default function EmployeesPage() {
                   </div>
 
                   {/* Documents Section */}
-                  {digilockerDetail.documents?.items && digilockerDetail.documents.items.length > 0 && (
-                    <>
-                      <h4 style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>Issued Documents ({digilockerDetail.documents.items.length})</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
-                        {digilockerDetail.documents.items.map((doc, i) => (
-                          <div key={i} style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text)' }}>{doc.name}</span>
-                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: 10 }}>{doc.issuer}</span>
+                  {(() => {
+                    const docsList = Array.isArray(digilockerDetail.documents)
+                      ? digilockerDetail.documents
+                      : (digilockerDetail.documents?.items || []);
+                    if (docsList.length === 0) return null;
+                    return (
+                      <>
+                        <h4 style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>Issued Documents ({docsList.length})</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
+                          {docsList.map((doc, i) => (
+                            <div key={i} style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text)' }}>{doc.name}</span>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: 10 }}>{doc.issuer}</span>
+                                {doc.date && <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginLeft: 10 }}>({doc.date})</span>}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                {doc.fileData ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        const mime = doc.fileMimeType || 'application/pdf';
+                                        const byteChars = atob(doc.fileData);
+                                        const byteArray = new Uint8Array(byteChars.length);
+                                        for (let i = 0; i < byteChars.length; i++) {
+                                          byteArray[i] = byteChars.charCodeAt(i);
+                                        }
+                                        const blob = new Blob([byteArray], { type: mime });
+                                        const url = URL.createObjectURL(blob);
+                                        const ext = mime.includes('pdf') ? 'pdf' : mime.includes('xml') ? 'xml' : 'bin';
+                                        const fileName = `${(doc.name || doc.doctype || 'document').replace(/[^a-zA-Z0-9 ]/g, '_')}.${ext}`;
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = fileName;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        URL.revokeObjectURL(url);
+                                      } catch (err) {
+                                        console.error('Download error:', err);
+                                      }
+                                    }}
+                                    title="Download document"
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: '4px 10px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #10b981',
+                                      background: 'rgba(16, 185, 129, 0.1)',
+                                      color: '#10b981',
+                                      cursor: 'pointer',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                      transition: 'all 0.15s',
+                                    }}
+                                  >
+                                    <Download size={12} />
+                                    Download
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No file</span>
+                                )}
+                                <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderRadius: 8 }}>{doc.doctype}</span>
+                              </div>
                             </div>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderRadius: 8 }}>{doc.doctype}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {/* ICJS Profile */}
                   {digilockerDetail.icjs && (

@@ -90,7 +90,38 @@ export async function GET(req) {
   const db = await getDb();
 
   if (employeeId) {
-    // Get specific employee's DigiLocker data
+    // First try real-time users collection
+    const user = await db.collection('users').findOne({ id: employeeId });
+    if (user && user.digilockerProfile && user.digilockerProfile.verified) {
+      const dl = user.digilockerProfile;
+      const data = {
+        verified: true,
+        userId: employeeId,
+        digilockerid: dl.digilockerid || null,
+        name: dl.name || null,
+        dob: dl.dob || null,
+        gender: dl.gender || null,
+        aadhaar: dl.maskedAadhaar || null,
+        mobile: dl.mobile || null,
+        email: dl.email || null,
+        reference_key: dl.referenceKey || null,
+        username: dl.preferredUsername || null,
+        pan: dl.panNumber || null,
+        dl_no: dl.drivingLicence || null,
+        photo: dl.photo || null,
+        documents: dl.documents || null,
+        rawTokenResponse: dl.rawTokenResponse || null,
+        rawUserResponse: dl.rawUserResponse || null,
+        rawDocumentsResponse: dl.rawDocumentsResponse || null,
+        verifiedAt: dl.linkedAt || null,
+      };
+      if (data.dob) {
+        data.age = calculateAge(data.dob);
+      }
+      return NextResponse.json(data);
+    }
+
+    // Get specific employee's DigiLocker data from fallback collection
     const record = await db.collection('digilocker_verifications').findOne({ userId: employeeId });
     if (!record) {
       return NextResponse.json({ verified: false, userId: employeeId });
@@ -104,13 +135,46 @@ export async function GET(req) {
 
   // Get all DigiLocker verifications
   const verifications = await db.collection('digilocker_verifications').find({}).toArray();
+  const usersWithDigi = await db.collection('users').find({ 'digilockerProfile.verified': true }).toArray();
+
   const verificationMap = {};
+
   for (const v of verifications) {
     const { _id, ...data } = v;
     if (data.dob) {
       data.age = calculateAge(data.dob);
     }
     verificationMap[v.userId] = data;
+  }
+
+  for (const u of usersWithDigi) {
+    if (!u.id) continue;
+    const dl = u.digilockerProfile;
+    const data = {
+      verified: true,
+      userId: u.id,
+      digilockerid: dl.digilockerid || null,
+      name: dl.name || null,
+      dob: dl.dob || null,
+      gender: dl.gender || null,
+      aadhaar: dl.maskedAadhaar || null,
+      mobile: dl.mobile || null,
+      email: dl.email || null,
+      reference_key: dl.referenceKey || null,
+      username: dl.preferredUsername || null,
+      pan: dl.panNumber || null,
+      dl_no: dl.drivingLicence || null,
+      photo: dl.photo || null,
+      documents: dl.documents || null,
+      rawTokenResponse: dl.rawTokenResponse || null,
+      rawUserResponse: dl.rawUserResponse || null,
+      rawDocumentsResponse: dl.rawDocumentsResponse || null,
+      verifiedAt: dl.linkedAt || null,
+    };
+    if (data.dob) {
+      data.age = calculateAge(data.dob);
+    }
+    verificationMap[u.id] = data;
   }
 
   return NextResponse.json({ verifications: verificationMap });
