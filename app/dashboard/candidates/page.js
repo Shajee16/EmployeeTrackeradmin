@@ -1450,6 +1450,79 @@ export default function CandidateRosterPage() {
                     Linked on {new Date(dp.linkedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </div>
                 )}
+
+                {/* Raw API Responses Section */}
+                {(dp.rawTokenResponse || dp.rawUserResponse || dp.rawDocumentsResponse) && (
+                  <div style={{ marginTop: '1.25rem' }}>
+                    <h4
+                      style={{
+                        margin: '0 0 0.6rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: '#6366f1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                      }}
+                    >
+                      <FileText size={14} />
+                      Raw API Responses
+                    </h4>
+                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                      {[
+                        { label: 'Token Response', data: dp.rawTokenResponse },
+                        { label: 'User API Response', data: dp.rawUserResponse },
+                        { label: 'Documents API Response', data: dp.rawDocumentsResponse },
+                      ].filter(item => item.data).map((item) => (
+                        <details
+                          key={item.label}
+                          style={{
+                            borderRadius: '10px',
+                            border: '1px solid var(--border-color, #e2e8f0)',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <summary
+                            style={{
+                              padding: '0.6rem 1rem',
+                              background: 'var(--bg, #f8fafc)',
+                              cursor: 'pointer',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              color: 'var(--ink, #334155)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              userSelect: 'none',
+                            }}
+                          >
+                            <FileText size={14} style={{ color: '#6366f1', flexShrink: 0 }} />
+                            {item.label}
+                          </summary>
+                          <pre
+                            style={{
+                              margin: 0,
+                              padding: '0.75rem 1rem',
+                              background: '#1e293b',
+                              color: '#e2e8f0',
+                              fontSize: '0.72rem',
+                              lineHeight: 1.5,
+                              overflow: 'auto',
+                              maxHeight: '300px',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+                            }}
+                          >
+                            {JSON.stringify(item.data, null, 2)}
+                          </pre>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
