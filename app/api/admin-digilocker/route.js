@@ -200,10 +200,10 @@ export async function DELETE(req) {
   // Remove digilocker verification record
   await db.collection('digilocker_verifications').deleteOne({ userId: employeeId });
   
-  // Unset verified flags in the users collection
+  // Unset verified flags and profile in the users collection
   await db.collection('users').updateOne(
     { id: employeeId },
-    { $unset: { digilockerVerified: '', digilockerVerifiedAt: '' } }
+    { $unset: { digilockerVerified: '', digilockerVerifiedAt: '', digilockerProfile: '' } }
   );
 
   return NextResponse.json({ success: true, message: `DigiLocker unlinked successfully for employee ${employeeId}` });
