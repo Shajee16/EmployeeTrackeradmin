@@ -1196,58 +1196,158 @@ export default function EmployeesPage() {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         e.preventDefault();
-                                        // Generate PDF from certificate data + document metadata
-                                        const buildRows = (obj, prefix = '') => {
-                                          if (!obj || typeof obj !== 'object') return '';
-                                          return Object.entries(obj)
-                                            .filter(([k, v]) => v !== null && v !== undefined && v !== '' && k !== '_id' && k !== 'Signature' && k !== 'rawXml')
-                                            .map(([k, v]) => {
-                                              const label = (prefix ? `${prefix} › ` : '') + k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/@/g, '').trim();
-                                              if (v && typeof v === 'object' && !Array.isArray(v)) return buildRows(v, label);
-                                              if (Array.isArray(v)) {
-                                                return v.map((item, vi) => {
-                                                  if (typeof item === 'object') return buildRows(item, `${label} [${vi + 1}]`);
-                                                  return `<tr><td style="padding:6px 12px;font-weight:600;color:#475569;border:1px solid #e2e8f0;width:40%;background:#f8fafc">${label} [${vi + 1}]</td><td style="padding:6px 12px;border:1px solid #e2e8f0">${String(item)}</td></tr>`;
-                                                }).join('');
+                                        // Parse XML certificate data and generate a professional PDF
+                                        let certName = doc.name || doc.description || 'Document';
+                                        let certType = doc.doctype || '';
+                                        let certNumber = '';
+                                        let certStatus = '';
+                                        let issueDate = doc.date || '';
+                                        let orgName = doc.issuer || '';
+                                        let personName = '';
+                                        let personDob = '';
+                                        let personGender = '';
+                                        let certDataRows = '';
+                                        let qrBase64 = '';
+
+                                        const rawXml = doc.certificateData?.rawXml || '';
+                                        if (rawXml) {
+                                          try {
+                                            const parser = new DOMParser();
+                                            const xmlDoc = parser.parseFromString(rawXml, 'text/xml');
+                                            const cert = xmlDoc.querySelector('Certificate');
+                                            if (cert) {
+                                              certName = cert.getAttribute('name') || certName;
+                                              certType = cert.getAttribute('type') || certType;
+                                              certNumber = cert.getAttribute('number') || '';
+                                              certStatus = cert.getAttribute('status') || '';
+                                              issueDate = cert.getAttribute('issueDate') || cert.getAttribute('issuedAt') || issueDate;
+                                            }
+                                            const org = xmlDoc.querySelector('IssuedBy Organization');
+                                            if (org) orgName = org.getAttribute('name') || orgName;
+                                            const person = xmlDoc.querySelector('IssuedTo Person');
+                                            if (person) {
+                                              personName = person.getAttribute('name') || '';
+                                              personDob = person.getAttribute('dob') || '';
+                                              personGender = person.getAttribute('gender') || '';
+                                            }
+                                            const certDataEl = xmlDoc.querySelector('CertificateData');
+                                            if (certDataEl) {
+                                              const children = certDataEl.children;
+                                              for (let ci = 0; ci < children.length; ci++) {
+                                                const child = children[ci];
+                                                const tagName = child.tagName;
+                                                const attrs = child.attributes;
+                                                for (let ai = 0; ai < attrs.length; ai++) {
+                                                  const a = attrs[ai];
+                                                  if (a.value) {
+                                                    certDataRows += `<tr><td class="label">${tagName} — ${a.name.replace(/([A-Z])/g, ' $1').trim()}</td><td class="value">${a.value}</td></tr>`;
+                                                  }
+                                                }
+                                                // Check for nested elements (e.g., subjects in marksheets)
+                                                if (child.children.length > 0) {
+                                                  for (let si = 0; si < child.children.length; si++) {
+                                                    const sub = child.children[si];
+                                                    const subAttrs = sub.attributes;
+                                                    let subRow = '';
+                                                    for (let sai = 0; sai < subAttrs.length; sai++) {
+                                                      if (subAttrs[sai].value) subRow += `${subAttrs[sai].name}: ${subAttrs[sai].value}  `;
+                                                    }
+                                                    if (subRow) certDataRows += `<tr><td class="label">${sub.tagName}</td><td class="value">${subRow.trim()}</td></tr>`;
+                                                  }
+                                                }
                                               }
-                                              return `<tr><td style="padding:6px 12px;font-weight:600;color:#475569;border:1px solid #e2e8f0;width:40%;background:#f8fafc">${label}</td><td style="padding:6px 12px;border:1px solid #e2e8f0">${String(v)}</td></tr>`;
+                                            }
+                                            const qrEl = xmlDoc.querySelector('QRMeta');
+                                            if (qrEl && qrEl.textContent) qrBase64 = qrEl.textContent.trim();
+                                          } catch (parseErr) { console.error('XML parse error:', parseErr); }
+                                        } else if (doc.certificateData && typeof doc.certificateData === 'object') {
+                                          // JSON fallback
+                                          const buildRows = (obj, prefix = '') => {
+                                            if (!obj || typeof obj !== 'object') return '';
+                                            return Object.entries(obj).filter(([k, v]) => v != null && v !== '' && k !== '_id' && k !== 'Signature').map(([k, v]) => {
+                                              const lbl = (prefix ? prefix + ' › ' : '') + k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+                                              if (typeof v === 'object' && !Array.isArray(v)) return buildRows(v, lbl);
+                                              return `<tr><td class="label">${lbl}</td><td class="value">${String(v)}</td></tr>`;
                                             }).join('');
-                                        };
-                                        const certRows = doc.certificateData ? buildRows(doc.certificateData) : '';
-                                        const html = `<!DOCTYPE html><html><head><title>${doc.name || 'Document'}</title><style>
-                                          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-                                          * { margin: 0; padding: 0; box-sizing: border-box; }
-                                          body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; }
-                                          .header { text-align: center; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 3px solid #6366f1; }
-                                          .header h1 { font-size: 22px; color: #1e293b; margin-bottom: 4px; }
-                                          .header p { font-size: 13px; color: #64748b; }
-                                          .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
-                                          .meta-item { padding: 10px 14px; background: #f1f5f9; border-radius: 8px; }
-                                          .meta-item label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; display: block; margin-bottom: 2px; }
-                                          .meta-item span { font-size: 14px; font-weight: 600; color: #1e293b; }
-                                          table { width: 100%; border-collapse: collapse; font-size: 13px; }
-                                          .section-title { font-size: 14px; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.05em; margin: 24px 0 10px; }
-                                          .footer { text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; }
-                                          @media print { body { padding: 20px; } }
-                                        </style></head><body>
-                                          <div class="header">
-                                            <h1>${doc.name || doc.description || 'Document'}</h1>
-                                            <p>DigiLocker Verified Document · ${doc.doctype}</p>
+                                          };
+                                          certDataRows = buildRows(doc.certificateData);
+                                        }
+
+                                        const statusBadge = certStatus === 'A' ? '<span style="background:#dcfce7;color:#16a34a;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700">ACTIVE</span>' : certStatus ? `<span style="background:#fef3c7;color:#d97706;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700">${certStatus}</span>` : '';
+
+                                        const html = `<!DOCTYPE html><html><head><title>${certName}</title><style>
+                                          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+                                          * { margin:0; padding:0; box-sizing:border-box; }
+                                          body { font-family:'Inter',sans-serif; color:#1e293b; background:#fff; }
+                                          .page { max-width:700px; margin:0 auto; padding:40px; }
+                                          .banner { background:linear-gradient(135deg,#4f46e5,#7c3aed,#6366f1); color:#fff; padding:28px 32px; border-radius:16px; margin-bottom:28px; position:relative; overflow:hidden; }
+                                          .banner::after { content:''; position:absolute; top:-40px; right:-40px; width:160px; height:160px; background:rgba(255,255,255,0.06); border-radius:50%; }
+                                          .banner h1 { font-size:22px; font-weight:800; letter-spacing:-0.02em; margin-bottom:4px; }
+                                          .banner .sub { font-size:13px; opacity:0.85; font-weight:400; }
+                                          .banner .badge { position:absolute; top:28px; right:32px; background:rgba(255,255,255,0.18); backdrop-filter:blur(4px); padding:6px 16px; border-radius:8px; font-size:12px; font-weight:700; letter-spacing:0.06em; }
+                                          .section { margin-bottom:20px; }
+                                          .section-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#6366f1; margin-bottom:10px; padding-bottom:6px; border-bottom:2px solid #e0e7ff; }
+                                          .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+                                          .info-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 16px; }
+                                          .info-card .lbl { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin-bottom:3px; }
+                                          .info-card .val { font-size:14px; font-weight:600; color:#1e293b; word-break:break-word; }
+                                          table { width:100%; border-collapse:collapse; margin-top:8px; }
+                                          td.label { padding:8px 14px; font-weight:600; color:#475569; border:1px solid #e2e8f0; width:40%; background:#f8fafc; font-size:12px; }
+                                          td.value { padding:8px 14px; border:1px solid #e2e8f0; font-size:13px; color:#1e293b; font-weight:500; }
+                                          .qr-section { display:flex; align-items:center; gap:20px; margin-top:16px; padding:16px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0; }
+                                          .qr-section img { width:100px; height:100px; border-radius:6px; }
+                                          .qr-section .qr-text { font-size:11px; color:#64748b; line-height:1.6; }
+                                          .footer { margin-top:32px; padding-top:16px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; }
+                                          .footer .left { font-size:10px; color:#94a3b8; }
+                                          .footer .right { font-size:10px; color:#6366f1; font-weight:600; }
+                                          @media print { .page { padding:20px; } .banner { break-inside:avoid; } }
+                                        </style></head><body><div class="page">
+                                          <div class="banner">
+                                            <h1>${certName}</h1>
+                                            <div class="sub">${orgName}${certNumber ? ' · ' + certNumber : ''}</div>
+                                            <div class="badge">${certType}</div>
                                           </div>
-                                          <div class="meta">
-                                            <div class="meta-item"><label>Issuer</label><span>${doc.issuer || 'N/A'}</span></div>
-                                            <div class="meta-item"><label>Date</label><span>${doc.date || 'N/A'}</span></div>
-                                            <div class="meta-item"><label>Document Type</label><span>${doc.doctype || 'N/A'}</span></div>
-                                            <div class="meta-item"><label>URI</label><span style="font-size:11px;word-break:break-all">${doc.uri || 'N/A'}</span></div>
+
+                                          ${personName ? `<div class="section">
+                                            <div class="section-head">Certificate Holder</div>
+                                            <div class="info-grid">
+                                              <div class="info-card"><div class="lbl">Full Name</div><div class="val">${personName}</div></div>
+                                              ${personDob ? `<div class="info-card"><div class="lbl">Date of Birth</div><div class="val">${personDob}</div></div>` : ''}
+                                              ${personGender ? `<div class="info-card"><div class="lbl">Gender</div><div class="val">${personGender}</div></div>` : ''}
+                                              ${certNumber ? `<div class="info-card"><div class="lbl">Document Number</div><div class="val">${certNumber}</div></div>` : ''}
+                                            </div>
+                                          </div>` : ''}
+
+                                          <div class="section">
+                                            <div class="section-head">Document Information</div>
+                                            <div class="info-grid">
+                                              <div class="info-card"><div class="lbl">Issuing Authority</div><div class="val">${orgName}</div></div>
+                                              <div class="info-card"><div class="lbl">Document Type</div><div class="val">${certName} (${certType})</div></div>
+                                              ${issueDate ? `<div class="info-card"><div class="lbl">Date</div><div class="val">${issueDate}</div></div>` : ''}
+                                              <div class="info-card"><div class="lbl">Status</div><div class="val">${statusBadge || 'Verified'}</div></div>
+                                            </div>
                                           </div>
-                                          ${certRows ? `<div class="section-title">Certificate Details</div><table>${certRows}</table>` : '<p style="color:#94a3b8;font-style:italic">No detailed certificate data available.</p>'}
-                                          <div class="footer">Generated from DigiLocker data · ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-                                        </body></html>`;
-                                        const printWin = window.open('', '_blank', 'width=800,height=600');
+
+                                          ${certDataRows ? `<div class="section">
+                                            <div class="section-head">Certificate Details</div>
+                                            <table>${certDataRows}</table>
+                                          </div>` : ''}
+
+                                          ${qrBase64 ? `<div class="qr-section">
+                                            <img src="data:image/png;base64,${qrBase64}" alt="QR Code"/>
+                                            <div class="qr-text"><strong>Verification QR Code</strong><br/>Scan to verify this document on DigiLocker.<br/>URI: ${doc.uri || ''}</div>
+                                          </div>` : ''}
+
+                                          <div class="footer">
+                                            <div class="left">Generated from DigiLocker verified data · ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                                            <div class="right">DigiLocker Verified ✓</div>
+                                          </div>
+                                        </div></body></html>`;
+                                        const printWin = window.open('', '_blank', 'width=800,height=700');
                                         if (printWin) {
                                           printWin.document.write(html);
                                           printWin.document.close();
-                                          setTimeout(() => { printWin.print(); }, 400);
+                                          setTimeout(() => { printWin.print(); }, 500);
                                         }
                                       }}
                                       style={{
