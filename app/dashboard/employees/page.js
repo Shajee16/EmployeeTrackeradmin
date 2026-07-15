@@ -1088,69 +1088,126 @@ export default function EmployeesPage() {
                       ? digilockerDetail.documents
                       : (digilockerDetail.documents?.items || []);
                     if (docsList.length === 0) return null;
+
+                    // Helper to render certificate data fields nicely
+                    const renderCertFields = (data, depth = 0) => {
+                      if (!data || typeof data !== 'object') return null;
+                      // If it's raw XML string, show as code block
+                      if (data.rawXml) {
+                        return (
+                          <pre style={{ fontSize: '0.72rem', color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace', margin: 0, maxHeight: 250, overflowY: 'auto', background: 'var(--bg-secondary)', padding: 10, borderRadius: 8 }}>
+                            {data.rawXml}
+                          </pre>
+                        );
+                      }
+                      const entries = Object.entries(data).filter(([k, v]) =>
+                        v !== null && v !== undefined && v !== '' && k !== '_id' && k !== 'Signature'
+                      );
+                      if (entries.length === 0) return null;
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: depth === 0 ? 'repeat(auto-fill, minmax(220px, 1fr))' : '1fr', gap: depth === 0 ? 8 : 4, paddingLeft: depth > 0 ? 12 : 0 }}>
+                          {entries.map(([key, val]) => {
+                            const label = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/@/g, '').trim();
+                            if (val && typeof val === 'object' && !Array.isArray(val)) {
+                              return (
+                                <div key={key} style={{ gridColumn: '1 / -1' }}>
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: depth === 0 ? 8 : 4, marginBottom: 4 }}>{label}</div>
+                                  {renderCertFields(val, depth + 1)}
+                                </div>
+                              );
+                            }
+                            if (Array.isArray(val)) {
+                              return (
+                                <div key={key} style={{ gridColumn: '1 / -1' }}>
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: depth === 0 ? 8 : 4, marginBottom: 4 }}>{label}</div>
+                                  {val.map((item, vi) => (
+                                    <div key={vi} style={{ marginBottom: 6, paddingLeft: 12, borderLeft: '2px solid var(--surface-border)' }}>
+                                      {typeof item === 'object' ? renderCertFields(item, depth + 1) : (
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text)' }}>{String(item)}</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return (
+                              <div key={key} style={{ padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 6, border: '1px solid var(--surface-border)' }}>
+                                <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>{label}</div>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)', wordBreak: 'break-word' }}>{String(val)}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    };
+
                     return (
                       <>
                         <h4 style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>Issued Documents ({docsList.length})</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
                           {docsList.map((doc, i) => (
-                            <div key={i} style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div>
-                                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text)' }}>{doc.name}</span>
-                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: 10 }}>{doc.issuer}</span>
-                                {doc.date && <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginLeft: 10 }}>({doc.date})</span>}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                {doc.fileData ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        const mime = doc.fileMimeType || 'application/pdf';
-                                        const byteChars = atob(doc.fileData);
-                                        const byteArray = new Uint8Array(byteChars.length);
-                                        for (let i = 0; i < byteChars.length; i++) {
-                                          byteArray[i] = byteChars.charCodeAt(i);
-                                        }
-                                        const blob = new Blob([byteArray], { type: mime });
-                                        const url = URL.createObjectURL(blob);
-                                        const ext = mime.includes('pdf') ? 'pdf' : mime.includes('xml') ? 'xml' : 'bin';
-                                        const fileName = `${(doc.name || doc.doctype || 'document').replace(/[^a-zA-Z0-9 ]/g, '_')}.${ext}`;
-                                        const a = document.createElement('a');
-                                        a.href = url;
-                                        a.download = fileName;
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        document.body.removeChild(a);
-                                        URL.revokeObjectURL(url);
-                                      } catch (err) {
-                                        console.error('Download error:', err);
-                                      }
-                                    }}
-                                    title="Download document"
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      padding: '4px 10px',
-                                      borderRadius: '6px',
-                                      border: '1px solid #10b981',
-                                      background: 'rgba(16, 185, 129, 0.1)',
-                                      color: '#10b981',
-                                      cursor: 'pointer',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 700,
-                                      transition: 'all 0.15s',
-                                    }}
-                                  >
-                                    <Download size={12} />
-                                    Download
-                                  </button>
+                            <details key={i} style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden', background: 'var(--surface)' }}>
+                              <summary style={{
+                                padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                listStyle: 'none', userSelect: 'none', gap: 10,
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                                  <FileText size={16} style={{ color: '#6366f1', flexShrink: 0 }} />
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)' }}>{doc.name || doc.description || 'Document'}</div>
+                                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: 1 }}>
+                                      {doc.issuer}{doc.date ? ` · ${doc.date}` : ''}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                  {doc.fileData && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        try {
+                                          const mime = doc.fileMimeType || 'application/pdf';
+                                          const byteChars = atob(doc.fileData);
+                                          const byteArray = new Uint8Array(byteChars.length);
+                                          for (let j = 0; j < byteChars.length; j++) byteArray[j] = byteChars.charCodeAt(j);
+                                          const blob = new Blob([byteArray], { type: mime });
+                                          const url = URL.createObjectURL(blob);
+                                          const ext = mime.includes('pdf') ? 'pdf' : mime.includes('xml') ? 'xml' : 'bin';
+                                          const a = document.createElement('a');
+                                          a.href = url;
+                                          a.download = `${(doc.name || 'document').replace(/[^a-zA-Z0-9 ]/g, '_')}.${ext}`;
+                                          document.body.appendChild(a);
+                                          a.click();
+                                          document.body.removeChild(a);
+                                          URL.revokeObjectURL(url);
+                                        } catch (err) { console.error('Download error:', err); }
+                                      }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                                        borderRadius: 6, border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)',
+                                        color: '#10b981', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700,
+                                      }}
+                                    >
+                                      <Download size={12} /> PDF
+                                    </button>
+                                  )}
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderRadius: 8 }}>{doc.doctype}</span>
+                                  <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />
+                                </div>
+                              </summary>
+                              <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--surface-border)' }}>
+                                {doc.certificateData ? (
+                                  <div style={{ marginTop: 12 }}>
+                                    {renderCertFields(doc.certificateData)}
+                                  </div>
                                 ) : (
-                                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No file</span>
+                                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: '12px 0 0' }}>
+                                    No certificate details available. Re-verify DigiLocker to fetch document data.
+                                  </p>
                                 )}
-                                <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderRadius: 8 }}>{doc.doctype}</span>
                               </div>
-                            </div>
+                            </details>
                           ))}
                         </div>
                       </>
