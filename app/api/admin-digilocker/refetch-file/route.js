@@ -54,16 +54,36 @@ export async function POST(request) {
     }
 
     const accessToken = user.digilockerProfile.dlAccessToken;
+    const documents = user.digilockerProfile.documents;
+    const doc = documents?.[docIndex];
+    const docName = doc?.name || doc?.description || `Document #${docIndex + 1}`;
+
     if (!accessToken) {
-      return NextResponse.json({ error: 'No saved DigiLocker access token. User needs to re-verify DigiLocker.' }, { status: 400 });
+      // No token saved — flag for re-verification with specific document info
+      await db.collection('users').updateOne(
+        { id: employeeId },
+        {
+          $set: {
+            'digilockerProfile.reverifyRequested': true,
+            'digilockerProfile.reverifyRequestedAt': new Date(),
+            'digilockerProfile.reverifyRequestedBy': auth.session.name || auth.session.email || 'Admin',
+          },
+          $addToSet: {
+            'digilockerProfile.reverifyRequestedDocs': docName,
+          },
+        }
+      );
+      return NextResponse.json({
+        error: `Access token not available. A re-verification request for "${docName}" has been sent to the candidate.`,
+        tokenExpired: true,
+        notifiedCandidate: true,
+      }, { status: 400 });
     }
 
-    const documents = user.digilockerProfile.documents;
     if (!documents || !documents[docIndex]) {
       return NextResponse.json({ error: `Document at index ${docIndex} not found` }, { status: 404 });
     }
 
-    const doc = documents[docIndex];
     if (!doc.uri) {
       return NextResponse.json({ error: 'Document has no URI' }, { status: 400 });
     }
@@ -89,7 +109,7 @@ export async function POST(request) {
       const errText = await fileRes.text().catch(() => '');
       const tokenExpired = fileRes.status === 401;
 
-      // If token expired, flag the user for re-verification
+      // If token expired, flag the user for re-verification with specific doc
       if (tokenExpired) {
         await db.collection('users').updateOne(
           { id: employeeId },
@@ -99,16 +119,20 @@ export async function POST(request) {
               'digilockerProfile.reverifyRequestedAt': new Date(),
               'digilockerProfile.reverifyRequestedBy': auth.session.name || auth.session.email || 'Admin',
             },
+            $addToSet: {
+              'digilockerProfile.reverifyRequestedDocs': docName,
+            },
           }
         );
       }
 
       return NextResponse.json({
         error: tokenExpired
-          ? 'DigiLocker access token has expired. A re-verification request has been sent to the candidate.'
+          ? `DigiLocker token expired. A re-verification request for "${docName}" has been sent to the candidate.`
           : `DigiLocker returned ${fileRes.status}`,
         detail: errText.substring(0, 500),
         tokenExpired,
+        notifiedCandidate: tokenExpired,
       }, { status: 502 });
     }
 

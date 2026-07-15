@@ -98,7 +98,11 @@ export default function EmployeesPage() {
           return { ...prev, documents: updatedDocs };
         });
       } else {
-        alert(`Error: ${data.error || 'Failed to fetch file'}`);
+        if (data.notifiedCandidate) {
+          alert(`📩 Re-verification request sent!\n\n${data.error}\n\nThe candidate will see a notification on their dashboard to re-verify DigiLocker.`);
+        } else {
+          alert(`Error: ${data.error || 'Failed to fetch file'}`);
+        }
       }
     } catch (err) {
       console.error(err);
