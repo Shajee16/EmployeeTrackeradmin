@@ -25,6 +25,7 @@ import {
   User,
   FileText,
   CreditCard,
+  Download,
 } from 'lucide-react';
 
 export default function CandidateRosterPage() {
@@ -1397,9 +1398,58 @@ export default function CandidateRosterPage() {
                             }}
                           >
                             <FileText size={14} style={{ color: '#6366f1', flexShrink: 0 }} />
-                            {doc.name || doc.description || 'Document'}
+                            <span style={{ flex: 1 }}>{doc.name || doc.description || 'Document'}</span>
+                            {doc.fileData && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    const mime = doc.fileMimeType || 'application/pdf';
+                                    const byteChars = atob(doc.fileData);
+                                    const byteArray = new Uint8Array(byteChars.length);
+                                    for (let i = 0; i < byteChars.length; i++) {
+                                      byteArray[i] = byteChars.charCodeAt(i);
+                                    }
+                                    const blob = new Blob([byteArray], { type: mime });
+                                    const url = URL.createObjectURL(blob);
+                                    const ext = mime.includes('pdf') ? 'pdf' : mime.includes('xml') ? 'xml' : 'bin';
+                                    const fileName = `${(doc.name || doc.doctype || 'document').replace(/[^a-zA-Z0-9 ]/g, '_')}.${ext}`;
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = fileName;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                  } catch (err) {
+                                    console.error('Download error:', err);
+                                  }
+                                }}
+                                title="Download document"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  padding: '0.25rem 0.6rem',
+                                  borderRadius: '6px',
+                                  border: '1px solid #86efac',
+                                  background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
+                                  color: '#065f46',
+                                  cursor: 'pointer',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  flexShrink: 0,
+                                  transition: 'all 0.15s',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'linear-gradient(135deg, #d1fae5, #a7f3d0)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'linear-gradient(135deg, #ecfdf5, #d1fae5)'; }}
+                              >
+                                <Download size={12} />
+                                Download
+                              </button>
+                            )}
                           </div>
-                          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
                             {doc.doctype && (
                               <span
                                 style={{
@@ -1423,6 +1473,11 @@ export default function CandidateRosterPage() {
                             {doc.date && (
                               <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
                                 {doc.date}
+                              </span>
+                            )}
+                            {!doc.fileData && (
+                              <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                No file available
                               </span>
                             )}
                           </div>
