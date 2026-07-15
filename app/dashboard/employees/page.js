@@ -69,6 +69,44 @@ export default function EmployeesPage() {
   const [digilockerDetail, setDigilockerDetail] = useState(null);
   const [loadingDigilocker, setLoadingDigilocker] = useState(false);
   const [visibleFields, setVisibleFields] = useState({});
+  const [refetchingDocs, setRefetchingDocs] = useState({});
+
+  const refetchDocument = async (employeeId, docIndex, docName) => {
+    const key = `${employeeId}-${docIndex}`;
+    setRefetchingDocs(prev => ({ ...prev, [key]: true }));
+    try {
+      const res = await fetch('/api/admin-digilocker/refetch-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId, docIndex })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Successfully fetched original file for "${docName}" from DigiLocker!`);
+        setDigilockerDetail(prev => {
+          if (!prev) return prev;
+          // Support both array structures
+          const rawDocs = Array.isArray(prev.documents) ? prev.documents : (prev.documents?.items || []);
+          const updatedDocs = [...rawDocs];
+          if (updatedDocs[docIndex]) {
+            updatedDocs[docIndex] = {
+              ...updatedDocs[docIndex],
+              fileData: data.fileData,
+              fileMimeType: data.fileMimeType
+            };
+          }
+          return { ...prev, documents: updatedDocs };
+        });
+      } else {
+        alert(`Error: ${data.error || 'Failed to fetch file'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error fetching file. Please try again.');
+    } finally {
+      setRefetchingDocs(prev => ({ ...prev, [key]: false }));
+    }
+  };
 
   const toggleFieldVisibility = (label) => {
     setVisibleFields(prev => ({ ...prev, [label]: !prev[label] }));
@@ -1161,7 +1199,7 @@ export default function EmployeesPage() {
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                                  {doc.fileData && (
+                                  {doc.fileData ? (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1189,6 +1227,23 @@ export default function EmployeesPage() {
                                       }}
                                     >
                                       <Download size={12} /> Original
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        refetchDocument(digilockerModal.id, i, doc.name || doc.description || 'Document');
+                                      }}
+                                      disabled={refetchingDocs[`${digilockerModal.id}-${i}`]}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                                        borderRadius: 6, border: '1px solid #d97706', background: 'rgba(217,119,6,0.1)',
+                                        color: '#d97706', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700,
+                                        opacity: refetchingDocs[`${digilockerModal.id}-${i}`] ? 0.6 : 1,
+                                      }}
+                                    >
+                                      <Download size={12} /> {refetchingDocs[`${digilockerModal.id}-${i}`] ? 'Fetching...' : 'Fetch Original'}
                                     </button>
                                   )}
                                   <button
