@@ -1161,7 +1161,7 @@ export default function EmployeesPage() {
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                                  {doc.fileData ? (
+                                  {doc.fileData && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1173,10 +1173,9 @@ export default function EmployeesPage() {
                                           for (let j = 0; j < byteChars.length; j++) byteArray[j] = byteChars.charCodeAt(j);
                                           const blob = new Blob([byteArray], { type: mime });
                                           const url = URL.createObjectURL(blob);
-                                          const ext = mime.includes('pdf') ? 'pdf' : mime.includes('xml') ? 'xml' : 'bin';
                                           const a = document.createElement('a');
                                           a.href = url;
-                                          a.download = `${(doc.name || 'document').replace(/[^a-zA-Z0-9 ]/g, '_')}.${ext}`;
+                                          a.download = `${(doc.name || 'document').replace(/[^a-zA-Z0-9 ]/g, '_')}_original.pdf`;
                                           document.body.appendChild(a);
                                           a.click();
                                           document.body.removeChild(a);
@@ -1189,10 +1188,10 @@ export default function EmployeesPage() {
                                         color: '#10b981', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700,
                                       }}
                                     >
-                                      <Download size={12} /> PDF
+                                      <Download size={12} /> Original
                                     </button>
-                                  ) : (
-                                    <button
+                                  )}
+                                  <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         e.preventDefault();
@@ -1206,7 +1205,12 @@ export default function EmployeesPage() {
                                         let personName = '';
                                         let personDob = '';
                                         let personGender = '';
+                                        let personRegnNo = '';
+                                        let personAbcId = '';
                                         let certDataRows = '';
+                                        let subjectsHtml = '';
+                                        let courseHtml = '';
+                                        let examHtml = '';
                                         let qrBase64 = '';
 
                                         const rawXml = doc.certificateData?.rawXml || '';
@@ -1229,31 +1233,62 @@ export default function EmployeesPage() {
                                               personName = person.getAttribute('name') || '';
                                               personDob = person.getAttribute('dob') || '';
                                               personGender = person.getAttribute('gender') || '';
+                                              personRegnNo = person.getAttribute('regnNo') || person.getAttribute('rroll') || '';
+                                              personAbcId = person.getAttribute('abcAccountId') || '';
+                                            }
+                                            // Course info
+                                            const courseEl = xmlDoc.querySelector('Course');
+                                            if (courseEl) {
+                                              const cn = courseEl.getAttribute('courseName') || '';
+                                              const spec = courseEl.querySelector('Stream')?.getAttribute('name') || courseEl.getAttribute('specializationMajor') || '';
+                                              if (cn || spec) {
+                                                courseHtml = `<div class="section"><div class="section-head">Course Information</div><div class="info-grid">`;
+                                                if (cn) courseHtml += `<div class="info-card"><div class="lbl">Programme</div><div class="val">${cn}</div></div>`;
+                                                if (spec) courseHtml += `<div class="info-card" style="grid-column:1/-1"><div class="lbl">Specialization</div><div class="val">${spec}</div></div>`;
+                                                courseHtml += `</div></div>`;
+                                              }
+                                            }
+                                            // Examination info
+                                            const examEl = xmlDoc.querySelector('Examination');
+                                            if (examEl) {
+                                              const sem = examEl.getAttribute('sem') || '';
+                                              const month = examEl.getAttribute('month') || '';
+                                              const year = examEl.getAttribute('year') || '';
+                                              const cgpa = examEl.getAttribute('cgpa') || '';
+                                              const examType = examEl.getAttribute('examType') || '';
+                                              examHtml = `<div class="section"><div class="section-head">Examination</div><div class="info-grid">`;
+                                              if (sem) examHtml += `<div class="info-card"><div class="lbl">Semester</div><div class="val">${sem}</div></div>`;
+                                              if (month && year) examHtml += `<div class="info-card"><div class="lbl">Session</div><div class="val">${month} ${year}</div></div>`;
+                                              if (cgpa) examHtml += `<div class="info-card"><div class="lbl">CGPA</div><div class="val" style="font-size:18px;color:#4f46e5">${cgpa}</div></div>`;
+                                              if (examType) examHtml += `<div class="info-card"><div class="lbl">Type</div><div class="val">${examType}</div></div>`;
+                                              examHtml += `</div></div>`;
+                                            }
+                                            // Subjects table
+                                            const subjects = xmlDoc.querySelectorAll('Subject');
+                                            if (subjects.length > 0) {
+                                              subjectsHtml = `<div class="section"><div class="section-head">Subjects &amp; Grades</div><table class="subjects"><thead><tr><th>Code</th><th>Subject</th><th>Grade</th><th>GP</th><th>Max</th></tr></thead><tbody>`;
+                                              subjects.forEach(sub => {
+                                                const code = sub.getAttribute('code') || '';
+                                                const nm = sub.getAttribute('name') || '';
+                                                const grade = sub.getAttribute('grade') || '';
+                                                const gp = sub.getAttribute('gp') || '';
+                                                const mm = sub.getAttribute('marksMax') || '';
+                                                const gc = grade === 'O' ? '#16a34a' : grade === 'A+' ? '#2563eb' : grade === 'A' ? '#7c3aed' : '#1e293b';
+                                                subjectsHtml += `<tr><td style="font-family:monospace;font-size:11px;color:#64748b">${code}</td><td>${nm}</td><td style="text-align:center"><span style="background:${gc}11;color:${gc};padding:2px 10px;border-radius:6px;font-weight:700;font-size:12px">${grade}</span></td><td style="text-align:center;font-weight:700">${gp}</td><td style="text-align:center">${mm}</td></tr>`;
+                                              });
+                                              subjectsHtml += `</tbody></table></div>`;
                                             }
                                             const certDataEl = xmlDoc.querySelector('CertificateData');
-                                            if (certDataEl) {
+                                            if (certDataEl && !xmlDoc.querySelector('Subject')) {
                                               const children = certDataEl.children;
                                               for (let ci = 0; ci < children.length; ci++) {
                                                 const child = children[ci];
                                                 const tagName = child.tagName;
+                                                if (['OrgDetails','Examination','Course','Performance'].includes(tagName)) continue;
                                                 const attrs = child.attributes;
                                                 for (let ai = 0; ai < attrs.length; ai++) {
                                                   const a = attrs[ai];
-                                                  if (a.value) {
-                                                    certDataRows += `<tr><td class="label">${tagName} — ${a.name.replace(/([A-Z])/g, ' $1').trim()}</td><td class="value">${a.value}</td></tr>`;
-                                                  }
-                                                }
-                                                // Check for nested elements (e.g., subjects in marksheets)
-                                                if (child.children.length > 0) {
-                                                  for (let si = 0; si < child.children.length; si++) {
-                                                    const sub = child.children[si];
-                                                    const subAttrs = sub.attributes;
-                                                    let subRow = '';
-                                                    for (let sai = 0; sai < subAttrs.length; sai++) {
-                                                      if (subAttrs[sai].value) subRow += `${subAttrs[sai].name}: ${subAttrs[sai].value}  `;
-                                                    }
-                                                    if (subRow) certDataRows += `<tr><td class="label">${sub.tagName}</td><td class="value">${subRow.trim()}</td></tr>`;
-                                                  }
+                                                  if (a.value) certDataRows += `<tr><td class="label">${tagName} — ${a.name.replace(/([A-Z])/g, ' $1').trim()}</td><td class="value">${a.value}</td></tr>`;
                                                 }
                                               }
                                             }
@@ -1294,6 +1329,12 @@ export default function EmployeesPage() {
                                           table { width:100%; border-collapse:collapse; margin-top:8px; }
                                           td.label { padding:8px 14px; font-weight:600; color:#475569; border:1px solid #e2e8f0; width:40%; background:#f8fafc; font-size:12px; }
                                           td.value { padding:8px 14px; border:1px solid #e2e8f0; font-size:13px; color:#1e293b; font-weight:500; }
+                                          table.subjects { font-size:12px; border:none; }
+                                          table.subjects th { background:#4f46e5; color:#fff; padding:10px 12px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+                                          table.subjects th:first-child { border-radius:8px 0 0 0; }
+                                          table.subjects th:last-child { border-radius:0 8px 0 0; }
+                                          table.subjects td { padding:10px 12px; border-bottom:1px solid #f1f5f9; border-left:none; border-right:none; }
+                                          table.subjects tr:nth-child(even) { background:#f8fafc; }
                                           .qr-section { display:flex; align-items:center; gap:20px; margin-top:16px; padding:16px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0; }
                                           .qr-section img { width:100px; height:100px; border-radius:6px; }
                                           .qr-section .qr-text { font-size:11px; color:#64748b; line-height:1.6; }
@@ -1314,7 +1355,9 @@ export default function EmployeesPage() {
                                               <div class="info-card"><div class="lbl">Full Name</div><div class="val">${personName}</div></div>
                                               ${personDob ? `<div class="info-card"><div class="lbl">Date of Birth</div><div class="val">${personDob}</div></div>` : ''}
                                               ${personGender ? `<div class="info-card"><div class="lbl">Gender</div><div class="val">${personGender}</div></div>` : ''}
-                                              ${certNumber ? `<div class="info-card"><div class="lbl">Document Number</div><div class="val">${certNumber}</div></div>` : ''}
+                                              ${personRegnNo ? `<div class="info-card"><div class="lbl">Registration No</div><div class="val">${personRegnNo}</div></div>` : ''}
+                                              ${certNumber && certNumber !== personRegnNo ? `<div class="info-card"><div class="lbl">Document Number</div><div class="val">${certNumber}</div></div>` : ''}
+                                              ${personAbcId ? `<div class="info-card"><div class="lbl">ABC Account ID</div><div class="val">${personAbcId}</div></div>` : ''}
                                             </div>
                                           </div>` : ''}
 
@@ -1327,6 +1370,10 @@ export default function EmployeesPage() {
                                               <div class="info-card"><div class="lbl">Status</div><div class="val">${statusBadge || 'Verified'}</div></div>
                                             </div>
                                           </div>
+
+                                          ${courseHtml}
+                                          ${examHtml}
+                                          ${subjectsHtml}
 
                                           ${certDataRows ? `<div class="section">
                                             <div class="section-head">Certificate Details</div>
@@ -1356,9 +1403,8 @@ export default function EmployeesPage() {
                                         color: '#6366f1', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700,
                                       }}
                                     >
-                                      <Download size={12} /> PDF
+                                      <Download size={12} /> Certificate
                                     </button>
-                                  )}
                                   <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderRadius: 8 }}>{doc.doctype}</span>
                                   <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />
                                 </div>
