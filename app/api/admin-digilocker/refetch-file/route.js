@@ -87,10 +87,28 @@ export async function POST(request) {
 
     if (!fileRes.ok) {
       const errText = await fileRes.text().catch(() => '');
+      const tokenExpired = fileRes.status === 401;
+
+      // If token expired, flag the user for re-verification
+      if (tokenExpired) {
+        await db.collection('users').updateOne(
+          { id: employeeId },
+          {
+            $set: {
+              'digilockerProfile.reverifyRequested': true,
+              'digilockerProfile.reverifyRequestedAt': new Date(),
+              'digilockerProfile.reverifyRequestedBy': auth.session.name || auth.session.email || 'Admin',
+            },
+          }
+        );
+      }
+
       return NextResponse.json({
-        error: `DigiLocker returned ${fileRes.status}`,
+        error: tokenExpired
+          ? 'DigiLocker access token has expired. A re-verification request has been sent to the candidate.'
+          : `DigiLocker returned ${fileRes.status}`,
         detail: errText.substring(0, 500),
-        hint: fileRes.status === 401 ? 'Access token expired. User needs to re-verify DigiLocker.' : undefined,
+        tokenExpired,
       }, { status: 502 });
     }
 
