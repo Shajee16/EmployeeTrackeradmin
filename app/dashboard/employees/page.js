@@ -1161,7 +1161,7 @@ export default function EmployeesPage() {
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                                  {doc.fileData && (
+                                  {doc.fileData ? (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1187,6 +1187,73 @@ export default function EmployeesPage() {
                                         display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
                                         borderRadius: 6, border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)',
                                         color: '#10b981', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700,
+                                      }}
+                                    >
+                                      <Download size={12} /> PDF
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        // Generate PDF from certificate data + document metadata
+                                        const buildRows = (obj, prefix = '') => {
+                                          if (!obj || typeof obj !== 'object') return '';
+                                          return Object.entries(obj)
+                                            .filter(([k, v]) => v !== null && v !== undefined && v !== '' && k !== '_id' && k !== 'Signature' && k !== 'rawXml')
+                                            .map(([k, v]) => {
+                                              const label = (prefix ? `${prefix} › ` : '') + k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/@/g, '').trim();
+                                              if (v && typeof v === 'object' && !Array.isArray(v)) return buildRows(v, label);
+                                              if (Array.isArray(v)) {
+                                                return v.map((item, vi) => {
+                                                  if (typeof item === 'object') return buildRows(item, `${label} [${vi + 1}]`);
+                                                  return `<tr><td style="padding:6px 12px;font-weight:600;color:#475569;border:1px solid #e2e8f0;width:40%;background:#f8fafc">${label} [${vi + 1}]</td><td style="padding:6px 12px;border:1px solid #e2e8f0">${String(item)}</td></tr>`;
+                                                }).join('');
+                                              }
+                                              return `<tr><td style="padding:6px 12px;font-weight:600;color:#475569;border:1px solid #e2e8f0;width:40%;background:#f8fafc">${label}</td><td style="padding:6px 12px;border:1px solid #e2e8f0">${String(v)}</td></tr>`;
+                                            }).join('');
+                                        };
+                                        const certRows = doc.certificateData ? buildRows(doc.certificateData) : '';
+                                        const html = `<!DOCTYPE html><html><head><title>${doc.name || 'Document'}</title><style>
+                                          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+                                          * { margin: 0; padding: 0; box-sizing: border-box; }
+                                          body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; }
+                                          .header { text-align: center; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 3px solid #6366f1; }
+                                          .header h1 { font-size: 22px; color: #1e293b; margin-bottom: 4px; }
+                                          .header p { font-size: 13px; color: #64748b; }
+                                          .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+                                          .meta-item { padding: 10px 14px; background: #f1f5f9; border-radius: 8px; }
+                                          .meta-item label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; display: block; margin-bottom: 2px; }
+                                          .meta-item span { font-size: 14px; font-weight: 600; color: #1e293b; }
+                                          table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                                          .section-title { font-size: 14px; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.05em; margin: 24px 0 10px; }
+                                          .footer { text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; }
+                                          @media print { body { padding: 20px; } }
+                                        </style></head><body>
+                                          <div class="header">
+                                            <h1>${doc.name || doc.description || 'Document'}</h1>
+                                            <p>DigiLocker Verified Document · ${doc.doctype}</p>
+                                          </div>
+                                          <div class="meta">
+                                            <div class="meta-item"><label>Issuer</label><span>${doc.issuer || 'N/A'}</span></div>
+                                            <div class="meta-item"><label>Date</label><span>${doc.date || 'N/A'}</span></div>
+                                            <div class="meta-item"><label>Document Type</label><span>${doc.doctype || 'N/A'}</span></div>
+                                            <div class="meta-item"><label>URI</label><span style="font-size:11px;word-break:break-all">${doc.uri || 'N/A'}</span></div>
+                                          </div>
+                                          ${certRows ? `<div class="section-title">Certificate Details</div><table>${certRows}</table>` : '<p style="color:#94a3b8;font-style:italic">No detailed certificate data available.</p>'}
+                                          <div class="footer">Generated from DigiLocker data · ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                                        </body></html>`;
+                                        const printWin = window.open('', '_blank', 'width=800,height=600');
+                                        if (printWin) {
+                                          printWin.document.write(html);
+                                          printWin.document.close();
+                                          setTimeout(() => { printWin.print(); }, 400);
+                                        }
+                                      }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                                        borderRadius: 6, border: '1px solid #6366f1', background: 'rgba(99,102,241,0.1)',
+                                        color: '#6366f1', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700,
                                       }}
                                     >
                                       <Download size={12} /> PDF
