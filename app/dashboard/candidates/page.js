@@ -26,6 +26,7 @@ import {
   FileText,
   CreditCard,
   Download,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function CandidateRosterPage() {
@@ -44,6 +45,7 @@ export default function CandidateRosterPage() {
   const [onboardError, setOnboardError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [digiModal, setDigiModal] = useState(null); // candidate's digilockerProfile
+  const [resumeModal, setResumeModal] = useState(null); // { name, resume }
   const [departments, setDepartments] = useState([]);
 
   const fetchCandidates = useCallback(async () => {
@@ -129,11 +131,50 @@ export default function CandidateRosterPage() {
   function getProfileCompleteness(candidate) {
     const p = candidate.candidateProfile || {};
     let score = 0;
-    if (candidate.digilockerProfile?.verified) score += 25;
-    if (p.keySkills && p.keySkills.length > 0) score += 25;
-    if (p.employment && p.employment.length > 0) score += 25;
-    if (p.education && p.education.length > 0) score += 25;
+    if (candidate.digilockerProfile?.verified) score += 20;
+    if (p.keySkills && p.keySkills.length > 0) score += 20;
+    if (p.employment && p.employment.length > 0) score += 20;
+    if (p.education && p.education.length > 0) score += 20;
+    if (p.resume && (p.resume.dataUrl || p.resume.fileName)) score += 20;
     return score;
+  }
+
+  function formatFileSize(bytes) {
+    if (!bytes || bytes === 0) return '0 KB';
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
+  function openResumeInNewTab(resume) {
+    if (!resume?.dataUrl) return;
+    try {
+      const parts = resume.dataUrl.split(',');
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : resume.fileType || 'application/pdf';
+      const bstr = atob(parts[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const blob = new Blob([u8arr], { type: mime });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    } catch {
+      window.open(resume.dataUrl, '_blank');
+    }
+  }
+
+  function downloadResume(resume, candidateName) {
+    if (!resume?.dataUrl) return;
+    const a = document.createElement('a');
+    a.href = resume.dataUrl;
+    a.download = resume.fileName || `${(candidateName || 'Candidate').replace(/\s+/g, '_')}_Resume.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   return (
@@ -847,6 +888,147 @@ export default function CandidateRosterPage() {
                           ? '✓ Identity verified via DigiLocker — Click to view'
                           : 'Not linked yet'}
                       </p>
+                    </div>
+
+                    {/* Resume / CV */}
+                    <div
+                      style={{
+                        padding: '1rem',
+                        borderRadius: '12px',
+                        background: profile.resume && (profile.resume.fileName || profile.resume.dataUrl) ? '#f0f9ff' : 'var(--bg, #f8fafc)',
+                        border: `1px solid ${profile.resume && (profile.resume.fileName || profile.resume.dataUrl) ? '#bae6fd' : 'var(--border-color, #e2e8f0)'}`,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                        <h4
+                          style={{
+                            margin: 0,
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            color: 'var(--ink, #334155)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <FileText size={16} style={{ color: '#0284c7' }} />
+                          Resume / CV
+                        </h4>
+                        {profile.resume && (profile.resume.fileName || profile.resume.dataUrl) && (
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              color: '#0369a1',
+                              background: '#e0f2fe',
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '999px',
+                              border: '1px solid #bae6fd',
+                            }}
+                          >
+                            Attached
+                          </span>
+                        )}
+                      </div>
+
+                      {profile.resume && (profile.resume.fileName || profile.resume.dataUrl) ? (
+                        <div>
+                          <div
+                            style={{
+                              padding: '0.6rem 0.75rem',
+                              borderRadius: '8px',
+                              background: '#fff',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.82rem',
+                              marginBottom: '0.75rem',
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, color: 'var(--ink, #1e293b)', wordBreak: 'break-all' }}>
+                              {profile.resume.fileName || 'Candidate_Resume.pdf'}
+                            </div>
+                            <div style={{ color: 'var(--ink-soft, #64748b)', fontSize: '0.75rem', marginTop: '0.2rem' }}>
+                              {formatFileSize(profile.resume.fileSize)}
+                              {profile.resume.uploadedAt && ` • Uploaded ${new Date(profile.resume.uploadedAt).toLocaleDateString()}`}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setResumeModal({ name: candidate.name, resume: profile.resume });
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0.4rem 0.75rem',
+                                borderRadius: '8px',
+                                border: '1px solid #0284c7',
+                                background: '#0284c7',
+                                color: '#fff',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                              title="Preview in modal"
+                            >
+                              <Eye size={13} />
+                              Preview
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openResumeInNewTab(profile.resume);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0.4rem 0.75rem',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                background: '#fff',
+                                color: '#334155',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                              title="Open full document in new tab"
+                            >
+                              <ExternalLink size={13} />
+                              Open Tab
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadResume(profile.resume, candidate.name);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0.4rem 0.75rem',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                background: '#fff',
+                                color: '#334155',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                              title="Download Resume"
+                            >
+                              <Download size={13} />
+                              Download
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic' }}>
+                          No resume uploaded yet
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1575,6 +1757,243 @@ export default function CandidateRosterPage() {
                           </pre>
                         </details>
                       ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Resume Preview Modal */}
+      {resumeModal && (() => {
+        const { name, resume } = resumeModal;
+        const isPdf = resume?.fileType?.includes('pdf') || resume?.fileName?.toLowerCase().endsWith('.pdf') || (resume?.dataUrl && resume.dataUrl.startsWith('data:application/pdf'));
+        const isImage = resume?.fileType?.includes('image') || (resume?.dataUrl && resume.dataUrl.startsWith('data:image'));
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1.5rem',
+            }}
+            onClick={() => setResumeModal(null)}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '900px',
+                height: '85vh',
+                background: 'var(--surface, #ffffff)',
+                borderRadius: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                overflow: 'hidden',
+                border: '1px solid var(--border-color, #e2e8f0)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div
+                style={{
+                  padding: '1rem 1.5rem',
+                  borderBottom: '1px solid var(--border-color, #e2e8f0)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: 'var(--bg, #f8fafc)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: '#0284c7',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <FileText size={18} />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <h3
+                      style={{
+                        margin: 0,
+                        fontSize: '1rem',
+                        fontWeight: 700,
+                        color: 'var(--ink, #0f172a)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {resume?.fileName || `${name}'s Resume`}
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--ink-soft, #64748b)' }}>
+                      Candidate: {name} • {formatFileSize(resume?.fileSize)}
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button
+                    onClick={() => openResumeInNewTab(resume)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.45rem 0.8rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color, #cbd5e1)',
+                      background: '#fff',
+                      color: '#334155',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                    title="Open in new browser tab"
+                  >
+                    <ExternalLink size={14} />
+                    New Tab
+                  </button>
+                  <button
+                    onClick={() => downloadResume(resume, name)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.45rem 0.8rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: '#0284c7',
+                      color: '#fff',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                    title="Download resume file"
+                  >
+                    <Download size={14} />
+                    Download
+                  </button>
+                  <button
+                    onClick={() => setResumeModal(null)}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color, #cbd5e1)',
+                      background: '#fff',
+                      color: '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body / Viewer */}
+              <div style={{ flex: 1, position: 'relative', background: '#334155', overflow: 'hidden' }}>
+                {isPdf && resume?.dataUrl ? (
+                  <iframe
+                    src={resume.dataUrl}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                    title="Resume Preview"
+                  />
+                ) : isImage && resume?.dataUrl ? (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '1rem',
+                      overflow: 'auto',
+                    }}
+                  >
+                    <img
+                      src={resume.dataUrl}
+                      alt="Resume Preview"
+                      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '1rem',
+                      background: '#f8fafc',
+                      color: '#334155',
+                      padding: '2rem',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '16px',
+                        background: '#e0f2fe',
+                        color: '#0284c7',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <FileText size={32} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>
+                        {resume?.fileName || 'Candidate Resume'}
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', maxWidth: '400px' }}>
+                        This document format is best viewed when downloaded or opened directly on your system.
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                      <button
+                        onClick={() => downloadResume(resume, name)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          padding: '0.6rem 1.2rem',
+                          borderRadius: '10px',
+                          border: 'none',
+                          background: '#0284c7',
+                          color: '#fff',
+                          fontWeight: 700,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Download size={16} />
+                        Download File
+                      </button>
                     </div>
                   </div>
                 )}

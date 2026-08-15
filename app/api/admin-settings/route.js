@@ -8,9 +8,34 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   const db = await getDb();
-  const settings = await db.collection('user_settings').findOne({ userId: session.id }) || {};
-  const { _id, ...safe } = settings;
-  return NextResponse.json({ settings: safe });
+  const settings = await db.collection('user_settings').findOne({
+    $or: [
+      { userId: session.id },
+      { userId: session.email },
+    ],
+  }) || {};
+
+  // Also query admins collection to get any baseline info
+  const admin = await db.collection('admins').findOne({
+    $or: [
+      { email: { $regex: new RegExp(`^${session.email}$`, 'i') } },
+      { id: session.id },
+    ],
+  });
+
+  const merged = {
+    displayName: settings.displayName || admin?.displayName || admin?.name || '',
+    phone: settings.phone || admin?.phone || '',
+    role: settings.role || admin?.signatureDesignation || admin?.role || '',
+    department: settings.department || admin?.signatureDepartment || admin?.department || '',
+    profilePicture: settings.profilePicture || null,
+    notifLeadAssigned: settings.notifLeadAssigned !== false,
+    notifNewEmployee: settings.notifNewEmployee !== false,
+    notifDailyReport: settings.notifDailyReport !== false,
+    notifLoginAlert: settings.notifLoginAlert === true,
+  };
+
+  return NextResponse.json({ settings: merged });
 }
 
 export async function PUT(req) {
@@ -32,29 +57,49 @@ export async function PUT(req) {
   if (body.type === 'theme') update.themeMode = sanitizeString(body.theme || 'dark', 20);
   if (body.type === 'themeColor') update.themeColor = sanitizeString(body.themeColor || 'beige', 20);
   if (body.type === 'profile') {
-    update.displayName = sanitizeString(body.displayName || '', 100);
-    update.phone = sanitizeString(body.phone || '', 20);
-    update.role = sanitizeString(body.role || '', 100);
-    update.department = sanitizeString(body.department || '', 100);
+    const cleanDisplayName = sanitizeString(body.displayName || '', 100);
+    const cleanPhone = sanitizeString(body.phone || '', 20);
+    const cleanRole = sanitizeString(body.role || '', 100);
+    const cleanDepartment = sanitizeString(body.department || '', 100);
 
-    // Sync name to the admins collection so Admin Management, activity logs etc. stay consistent
-    const newName = sanitizeString(body.displayName || '', 100);
-    if (newName) {
-      const adminsCol = db.collection('admins');
-      // Match by email (session.email) or by custom id (session.id)
-      await adminsCol.updateOne(
-        { $or: [{ email: session.email }, { id: session.id }] },
-        { 
-          $set: { 
-            name: newName, 
-            phone: sanitizeString(body.phone || '', 20), 
-            role: sanitizeString(body.role || '', 100),
-            department: sanitizeString(body.department || '', 100),
-            updatedAt: new Date().toISOString() 
-          } 
-        }
-      );
+    update.displayName = cleanDisplayName;
+    update.phone = cleanPhone;
+    update.role = cleanRole;
+    update.department = cleanDepartment;
+
+    // Sync to the admins collection so Certificates, Admin Management, activity logs etc. stay consistent
+    const adminsCol = db.collection('admins');
+    const adminQuery = {
+      $or: [
+        { email: { $regex: new RegExp(`^${session.email}$`, 'i') } },
+        { id: session.id },
+      ],
+    };
+    if (session.id && session.id.length === 24) {
+      try {
+        const { ObjectId } = await import('mongodb');
+        adminQuery.$or.push({ _id: new ObjectId(session.id) });
+      } catch {}
     }
+
+    const adminSet = {
+      phone: cleanPhone,
+      signatureDesignation: cleanRole,
+      signatureDepartment: cleanDepartment,
+      updatedAt: new Date().toISOString(),
+    };
+    if (cleanDisplayName) {
+      adminSet.displayName = cleanDisplayName;
+      adminSet.name = cleanDisplayName;
+    }
+    if (cleanRole) {
+      adminSet.role = cleanRole;
+    }
+    if (cleanDepartment) {
+      adminSet.department = cleanDepartment;
+    }
+
+    await adminsCol.updateOne(adminQuery, { $set: adminSet });
   }
   if (body.type === 'profilePicture') {
     if (!body.picture) {

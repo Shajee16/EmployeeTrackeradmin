@@ -41,48 +41,60 @@ function aOrAn(word) {
   return 'aeiou'.includes(first) ? 'an' : 'a';
 }
 
-function generateCertBody({ type, category, recipientName, recipientDesignation, respondentName, dateFrom, dateTo, remarks, companyName }) {
+function generateCertBody({ type, category, recipientName, recipientDesignation, respondentName, dateFrom, dateTo, remarks, companyName, recipientGender }) {
   const name = recipientName || '[Recipient Name]';
   const designation = recipientDesignation || '[Designation]';
   const guide = respondentName || '[Respondent Name]';
   const fromDate = dateFrom ? formatDateDisplay(dateFrom) : '[Start Date]';
   const toDate = dateTo ? formatDateDisplay(dateTo) : '[End Date]';
-  const qualities = remarks || 'hardworking, diligent, and honest in performing their duties';
   const company = companyName || 'Cluso Infolink';
 
+  // Gender-aware pronouns based on DigiLocker verification
+  const g = (recipientGender || '').toLowerCase().trim();
+  const isFemale = g === 'female' || g === 'f';
+  const isMale = g === 'male' || g === 'm';
+  const pSubject = isFemale ? 'she' : isMale ? 'he' : 'they';
+  const pSubjectCap = isFemale ? 'She' : isMale ? 'He' : 'They';
+  const pObject = isFemale ? 'her' : isMale ? 'him' : 'them';
+  const pPoss = isFemale ? 'her' : isMale ? 'his' : 'their';
+  const pPossCap = isFemale ? 'Her' : isMale ? 'His' : 'Their';
+  const pWas = (isFemale || isMale) ? 'was' : 'were';
+
+  const qualities = remarks || `hardworking, diligent, and honest in performing ${pPoss} duties`;
+
   if (type === 'excellence') {
-    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, has demonstrated exceptional performance, dedication, and outstanding contributions to the organization. ${name} has consistently exceeded expectations, shown remarkable initiative, and inspired excellence among peers.\n\nThe management extends its sincere appreciation for the exemplary work and unwavering commitment shown by ${name}. We recognize this achievement under the mentorship of <strong>${guide}</strong>.\n\nWe wish ${name} continued success and look forward to many more accomplishments.`;
+    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, has demonstrated exceptional performance, dedication, and outstanding contributions to the organization. ${name} has consistently exceeded expectations, shown remarkable initiative, and inspired excellence among peers.\\n\\nThe management extends its sincere appreciation for the exemplary work and unwavering commitment shown by ${name}. We recognize this achievement under the mentorship of <strong>${guide}</strong>.\\n\\nWe wish ${name} continued success and look forward to many more accomplishments.`;
   }
 
   if (type === 'relieving') {
-    return `This is to certify that <strong>${name}</strong> was employed at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>. ${name} has resigned from the services of the company and is officially relieved from all duties and responsibilities with effect from the close of business hours on <strong>${toDate}</strong>.\n\nDuring their tenure with us, ${name} demonstrated professionalism, integrity, and a strong work ethic. They worked under the supervision of <strong>${guide}</strong> and were found to be ${qualities}.\n\nWe thank ${name} for their contributions and wish them the very best in all future professional endeavors.`;
+    return `This is to certify that <strong>${name}</strong> was employed at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>. ${name} has resigned from the services of the company and is officially relieved from all duties and responsibilities with effect from the close of business hours on <strong>${toDate}</strong>.\\n\\nDuring ${pPoss} tenure with us, ${name} demonstrated professionalism, integrity, and a strong work ethic. ${pSubjectCap} worked under the supervision of <strong>${guide}</strong> and ${pWas} found to be ${qualities}.\\n\\nWe thank ${name} for ${pPoss} contributions and wish ${pObject} the very best in all future professional endeavors.`;
   }
 
   if (type === 'completion') {
     if (category === 'internship') {
-      return `This is to certify that <strong>${name}</strong> has successfully completed their Internship at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\n\nDuring their internship, they interned under the guidance of <strong>${guide}</strong> and were found to be ${qualities}.\n\nThe management would like to thank ${name} for the contributions made to the organization and wishes them all the best in their future endeavors.`;
+      return `This is to certify that <strong>${name}</strong> has successfully completed ${pPoss} Internship at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nDuring ${pPoss} internship, ${pSubject} interned under the guidance of <strong>${guide}</strong> and ${pWas} found to be ${qualities}.\\n\\nThe management would like to thank ${name} for the contributions made to the organization and wishes ${pObject} all the best in ${pPoss} future endeavors.`;
     }
     if (category === 'employment') {
-      return `This is to certify that <strong>${name}</strong> was employed at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\n\nDuring their tenure with us, ${name} demonstrated professionalism, integrity, and a strong work ethic. They worked under the supervision of <strong>${guide}</strong> and were found to be ${qualities}.\n\nWe wish ${name} continued success in their career and thank them for their valuable contributions.`;
+      return `This is to certify that <strong>${name}</strong> was employed at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nDuring ${pPoss} tenure with us, ${name} demonstrated professionalism, integrity, and a strong work ethic. ${pSubjectCap} worked under the supervision of <strong>${guide}</strong> and ${pWas} found to be ${qualities}.\\n\\nWe wish ${name} continued success in ${pPoss} career and thank ${pObject} for ${pPoss} valuable contributions.`;
     }
     if (category === 'course') {
-      return `This is to certify that <strong>${name}</strong> has successfully completed the professional development course at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\n\nThe course was conducted under the mentorship of <strong>${guide}</strong>. Throughout the program, ${name} demonstrated ${qualities} and successfully met all the requirements for course completion.\n\nWe congratulate ${name} on this accomplishment and wish them success in applying their newly acquired knowledge.`;
+      return `This is to certify that <strong>${name}</strong> has successfully completed the professional development course at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nThe course was conducted under the mentorship of <strong>${guide}</strong>. Throughout the program, ${name} demonstrated ${qualities} and successfully met all the requirements for course completion.\\n\\nWe congratulate ${name} on this accomplishment and wish ${pObject} success in applying ${pPoss} newly acquired knowledge.`;
     }
     if (category === 'training') {
-      return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong>, has successfully completed the specialized training program at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\n\nThe training was conducted under the guidance of <strong>${guide}</strong>. During the program, ${name} exhibited ${qualities} and demonstrated strong aptitude in mastering the required skills.\n\nThe management congratulates ${name} on the successful completion of this training.`;
+      return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong>, has successfully completed the specialized training program at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nThe training was conducted under the guidance of <strong>${guide}</strong>. During the program, ${name} exhibited ${qualities} and demonstrated strong aptitude in mastering the required skills.\\n\\nThe management congratulates ${name} on the successful completion of this training.`;
     }
     if (category === 'project') {
-      return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong>, has successfully delivered and completed the assigned project at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\n\nThe project was overseen by <strong>${guide}</strong>. Throughout the project lifecycle, ${name} demonstrated ${qualities} and played a pivotal role in its successful delivery.\n\nThe management extends its appreciation for the outstanding effort and dedication shown.`;
+      return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong>, has successfully delivered and completed the assigned project at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nThe project was overseen by <strong>${guide}</strong>. Throughout the project lifecycle, ${name} demonstrated ${qualities} and played a pivotal role in its successful delivery.\\n\\nThe management extends its appreciation for the outstanding effort and dedication shown.`;
     }
-    return `This is to certify that <strong>${name}</strong> has successfully completed the assigned program at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong> under the guidance of <strong>${guide}</strong>.\n\nDuring the program, ${name} was found to be ${qualities}.\n\nWe wish ${name} the very best in all future endeavors.`;
+    return `This is to certify that <strong>${name}</strong> has successfully completed the assigned program at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong> under the guidance of <strong>${guide}</strong>.\\n\\nDuring the program, ${name} was found to be ${qualities}.\\n\\nWe wish ${name} the very best in all future endeavors.`;
   }
 
   if (type === 'appreciation') {
-    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, is being recognized for their dedicated service, exceptional commitment, and positive contributions to the organization.\n\n${name} has worked under the guidance of <strong>${guide}</strong> and has consistently demonstrated ${qualities}. Their efforts have made a meaningful impact on the team and the organization as a whole.\n\nThe management expresses heartfelt gratitude for the outstanding service and looks forward to continued collaboration.`;
+    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, is being recognized for ${pPoss} dedicated service, exceptional commitment, and positive contributions to the organization.\\n\\n${name} has worked under the guidance of <strong>${guide}</strong> and has consistently demonstrated ${qualities}. ${pPossCap} efforts have made a meaningful impact on the team and the organization as a whole.\\n\\nThe management expresses heartfelt gratitude for the outstanding service and looks forward to continued collaboration.`;
   }
 
   if (type === 'achievement') {
-    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, has achieved a significant milestone that reflects their talent, perseverance, and dedication.\n\nThis achievement was accomplished under the mentorship of <strong>${guide}</strong>. During this period, ${name} demonstrated ${qualities} and set a commendable example for peers.\n\nThe management congratulates ${name} on this accomplishment and wishes them continued success in their professional journey.`;
+    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, has achieved a significant milestone that reflects ${pPoss} talent, perseverance, and dedication.\\n\\nThis achievement was accomplished under the mentorship of <strong>${guide}</strong>. During this period, ${name} demonstrated ${qualities} and set a commendable example for peers.\\n\\nThe management congratulates ${name} on this accomplishment and wishes ${pObject} continued success in ${pPoss} professional journey.`;
   }
 
   return '';
@@ -122,10 +134,10 @@ function getCertTitle(type, category) {
 // ═══════════════════════════════════════════════════════════
 // CERTIFICATE HTML TEMPLATES
 // ═══════════════════════════════════════════════════════════
-function renderCertificateHTML({ template, type, category, recipientName, recipientDesignation, recipientId, respondentName, respondentRole, respondentDepartment, dateFrom, dateTo, remarks, respondentSignature, id, qrCode, createdAt, companyName }) {
+function renderCertificateHTML({ template, type, category, recipientName, recipientDesignation, recipientId, recipientGender, respondentName, respondentRole, respondentDepartment, dateFrom, dateTo, remarks, respondentSignature, id, qrCode, createdAt, companyName }) {
   const title = getCertTitle(type, category);
   const company = companyName || 'Cluso Infolink';
-  const body = generateCertBody({ type, category, recipientName, recipientDesignation, respondentName, dateFrom, dateTo, remarks, companyName: company });
+  const body = generateCertBody({ type, category, recipientName, recipientDesignation, respondentName, dateFrom, dateTo, remarks, companyName: company, recipientGender });
   const bodyHtml = body.replace(/\n/g, '<br/>');
   const fromDate = dateFrom ? formatDateDisplay(dateFrom) : '';
   const toDate = dateTo ? formatDateDisplay(dateTo) : '';
@@ -642,7 +654,9 @@ export default function CertificatesPage() {
   const [certCategory, setCertCategory] = useState('');
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [selectedRespondent, setSelectedRespondent] = useState(null);
+  const [customRespondentName, setCustomRespondentName] = useState('');
   const [customRespondentRole, setCustomRespondentRole] = useState('');
+  const [customRespondentDepartment, setCustomRespondentDepartment] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState(() => formatDateForInput(new Date()));
   const [designation, setDesignation] = useState('');
@@ -690,6 +704,19 @@ export default function CertificatesPage() {
     fetch('/api/admin-certificates').then(r => r.json()).then(d => setPastCerts(d.certificates || [])).catch(() => {});
   }, []);
 
+  // Auto-select logged-in admin if available and none is selected yet
+  useEffect(() => {
+    if (!selectedRespondent && admins.length > 0 && user) {
+      const currentAdmin = admins.find(a => 
+        (user.email && a.email?.toLowerCase() === user.email?.toLowerCase()) || 
+        (user.id && a.id === user.id)
+      );
+      if (currentAdmin) {
+        setSelectedRespondent(currentAdmin);
+      }
+    }
+  }, [admins, user, selectedRespondent]);
+
   // Combine employees + candidates for recipient list
   const recipientList = useMemo(() => {
     const list = [];
@@ -701,6 +728,7 @@ export default function CertificatesPage() {
         department: e.department, 
         designation: e.designation, 
         type: 'Employee',
+        gender: e.gender || e.digilockerProfile?.gender || '',
         createdDate: e.joinedAt || e.createdAt || ''
       });
     });
@@ -713,6 +741,7 @@ export default function CertificatesPage() {
           department: '', 
           designation: '', 
           type: 'Candidate',
+          gender: c.digilockerProfile?.gender || '',
           createdDate: c.createdAt || c.onboardedAt || ''
         });
       }
@@ -773,12 +802,26 @@ export default function CertificatesPage() {
     return designationSuggestions.filter(sug => sug.toLowerCase().includes(s));
   }, [designationSuggestions, designation]);
 
-  // Set default remarks based on type/category
+  // Set default remarks based on type/category (gender-aware)
   useEffect(() => {
     if (certType && !remarks) {
-      setRemarks('hardworking, diligent, and honest in performing their duties');
+      const g = (selectedRecipient?.gender || '').toLowerCase().trim();
+      const pPoss = (g === 'female' || g === 'f') ? 'her' : (g === 'male' || g === 'm') ? 'his' : 'their';
+      setRemarks(`hardworking, diligent, and honest in performing ${pPoss} duties`);
     }
   }, [certType]);
+
+  // Update remarks pronoun when recipient changes (only if user hasn't customized it)
+  useEffect(() => {
+    if (selectedRecipient && remarks) {
+      const g = (selectedRecipient.gender || '').toLowerCase().trim();
+      const pPoss = (g === 'female' || g === 'f') ? 'her' : (g === 'male' || g === 'm') ? 'his' : 'their';
+      // Only update if it's still the default pattern
+      if (remarks.match(/^hardworking, diligent, and honest in performing (his|her|their) duties$/)) {
+        setRemarks(`hardworking, diligent, and honest in performing ${pPoss} duties`);
+      }
+    }
+  }, [selectedRecipient]);
 
   // Auto-fill designation and creation date from selected recipient
   useEffect(() => {
@@ -795,12 +838,16 @@ export default function CertificatesPage() {
     }
   }, [selectedRecipient]);
 
-  // Auto-fill custom respondent designation when selected respondent changes
+  // Auto-fill custom respondent details when selected respondent changes
   useEffect(() => {
     if (selectedRespondent) {
-      setCustomRespondentRole('Product Manager');
+      setCustomRespondentName(selectedRespondent.displayName || selectedRespondent.name || '');
+      setCustomRespondentRole(selectedRespondent.signatureDesignation || selectedRespondent.role || 'Product Manager');
+      setCustomRespondentDepartment(selectedRespondent.signatureDepartment || selectedRespondent.department || '');
     } else {
+      setCustomRespondentName('');
       setCustomRespondentRole('');
+      setCustomRespondentDepartment('');
     }
   }, [selectedRespondent]);
 
@@ -815,7 +862,9 @@ export default function CertificatesPage() {
     setCertCategory('');
     setSelectedRecipient(null);
     setSelectedRespondent(null);
+    setCustomRespondentName('');
     setCustomRespondentRole('');
+    setCustomRespondentDepartment('');
     setDateFrom('');
     setDateTo(formatDateForInput(new Date()));
     setDesignation('');
@@ -857,9 +906,10 @@ export default function CertificatesPage() {
     recipientEmail: selectedRecipient?.email || '',
     recipientId: selectedRecipient?.id || '',
     recipientDesignation: designation,
-    respondentName: selectedRespondent?.name || '',
-    respondentRole: customRespondentRole || selectedRespondent?.role || '',
-    respondentDepartment: selectedRespondent?.department || '',
+    recipientGender: selectedRecipient?.gender || '',
+    respondentName: (customRespondentName || selectedRespondent?.displayName || selectedRespondent?.name || '').trim(),
+    respondentRole: (customRespondentRole || selectedRespondent?.signatureDesignation || selectedRespondent?.role || '').trim(),
+    respondentDepartment: (customRespondentDepartment || selectedRespondent?.signatureDepartment || selectedRespondent?.department || '').trim(),
     dateFrom,
     dateTo,
     remarks,
@@ -1358,16 +1408,18 @@ export default function CertificatesPage() {
                       }}>
                         <Check size={18} color="#10b981" />
                         <div style={{ flex: 1 }}>
-                          <span style={{ fontWeight: 700, color: '#10b981' }}>Selected: </span>
-                          <span style={{ fontWeight: 600 }}>{selectedRespondent.name}</span>
-                          <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>({selectedRespondent.role})</span>
+                          <span style={{ fontWeight: 700, color: '#10b981' }}>Selected Signatory: </span>
+                          <span style={{ fontWeight: 600 }}>{customRespondentName || selectedRespondent.displayName || selectedRespondent.name}</span>
+                          <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>({customRespondentRole || selectedRespondent.signatureDesignation || selectedRespondent.role})</span>
                         </div>
                         <button onClick={() => setSelectedRespondent(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={16} /></button>
                       </div>
 
                       <div className="card" style={{ padding: '20px', marginBottom: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                          <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700 }}>Signature Settings for {selectedRespondent.name}</h4>
+                          <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700 }}>
+                            Signature Settings for {customRespondentName || selectedRespondent.displayName || selectedRespondent.name}
+                          </h4>
                           {selectedRespondent.signature && (
                             <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Saved Signature Active</span>
                           )}
@@ -1433,18 +1485,48 @@ export default function CertificatesPage() {
                       </div>
 
                       <div className="card" style={{ padding: '20px', marginBottom: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--surface-border)' }}>
-                        <h4 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: 700 }}>Respondent Designation / Title</h4>
-                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 12px' }}>
-                          Choose the designation to print under the signature on the certificate (defaults to respondent's system role).
+                        <h4 style={{ margin: '0 0 6px', fontSize: '0.92rem', fontWeight: 700 }}>Signatory & Respondent Information</h4>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+                          These details (Display Name, Designation, and Department) will appear as the signatory and mentor on the certificate.
                         </p>
-                        
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                          <div>
+                            <label className="form-label" style={{ marginBottom: 6, display: 'block', fontSize: '0.82rem', fontWeight: 600 }}>
+                              Signatory Display Name *
+                            </label>
+                            <input
+                              type="text"
+                              value={customRespondentName}
+                              onChange={(e) => setCustomRespondentName(e.target.value)}
+                              placeholder="e.g., India Ops"
+                              style={{ width: '100%', height: '42px', boxSizing: 'border-box' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="form-label" style={{ marginBottom: 6, display: 'block', fontSize: '0.82rem', fontWeight: 600 }}>
+                              Signatory Department / Subtitle
+                            </label>
+                            <input
+                              type="text"
+                              value={customRespondentDepartment}
+                              onChange={(e) => setCustomRespondentDepartment(e.target.value)}
+                              placeholder="e.g., Education, Training and Assessment"
+                              style={{ width: '100%', height: '42px', boxSizing: 'border-box' }}
+                            />
+                          </div>
+                        </div>
+
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                           <div>
-                            <label className="form-label" style={{ marginBottom: 6 }}>Select Title</label>
+                            <label className="form-label" style={{ marginBottom: 6, display: 'block', fontSize: '0.82rem', fontWeight: 600 }}>
+                              Select Designation / Title
+                            </label>
                             <select
                               value={
                                 [
-                                  selectedRespondent.role,
+                                  selectedRespondent.signatureDesignation || selectedRespondent.role,
                                   "Product Manager",
                                   "Project Head",
                                   "Team Lead",
@@ -1455,7 +1537,7 @@ export default function CertificatesPage() {
                                   "Co-Founder",
                                   "Chief Executive Officer",
                                   "Director"
-                                ].includes(customRespondentRole) 
+                                ].filter(Boolean).includes(customRespondentRole) 
                                   ? customRespondentRole 
                                   : "other"
                               }
@@ -1470,7 +1552,7 @@ export default function CertificatesPage() {
                               style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface)', fontSize: '0.88rem', height: '42px', outline: 'none' }}
                             >
                               {[
-                                selectedRespondent.role,
+                                selectedRespondent.signatureDesignation || selectedRespondent.role,
                                 "Product Manager",
                                 "Project Head",
                                 "Team Lead",
@@ -1481,9 +1563,9 @@ export default function CertificatesPage() {
                                 "Co-Founder",
                                 "Chief Executive Officer",
                                 "Director"
-                              ].filter((value, index, self) => self.indexOf(value) === index).map((opt) => (
+                              ].filter((value, index, self) => Boolean(value) && self.indexOf(value) === index).map((opt) => (
                                 <option key={opt} value={opt}>
-                                  {opt === selectedRespondent.role ? `${opt} (System Default)` : opt}
+                                  {opt === (selectedRespondent.signatureDesignation || selectedRespondent.role) ? `${opt} (Default)` : opt}
                                 </option>
                               ))}
                               <option value="other">Custom Designation...</option>
@@ -1491,7 +1573,9 @@ export default function CertificatesPage() {
                           </div>
                           
                           <div>
-                            <label className="form-label" style={{ marginBottom: 6 }}>Custom Designation Text</label>
+                            <label className="form-label" style={{ marginBottom: 6, display: 'block', fontSize: '0.82rem', fontWeight: 600 }}>
+                              Custom Designation Text
+                            </label>
                             <input
                               type="text"
                               value={customRespondentRole}
@@ -1523,12 +1607,12 @@ export default function CertificatesPage() {
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: '#fff', fontWeight: 700, fontSize: '0.9rem',
                         }}>
-                          {a.name?.charAt(0) || 'A'}
+                          {(a.displayName || a.name)?.charAt(0) || 'A'}
                         </div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{a.name}</div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{a.displayName || a.name}</div>
                           <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                            {a.role} • {a.department || 'Administration'}
+                            {a.signatureDesignation || a.role} • {a.signatureDepartment || a.department || 'Administration'}
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{a.email}</div>
                         </div>

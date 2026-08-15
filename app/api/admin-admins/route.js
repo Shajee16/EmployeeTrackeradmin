@@ -26,10 +26,30 @@ export async function GET() {
 
   const db = await getDb();
   const rawAdmins = await db.collection('admins').find({}).toArray();
-  const safe = rawAdmins.map(({ password, _id, ...a }) => ({
-    ...a,
-    id: a.id || _id.toString(),
-  }));
+  const allSettings = await db.collection('user_settings').find({}).toArray();
+
+  const safe = rawAdmins.map(({ password, _id, ...a }) => {
+    const adminId = a.id || _id.toString();
+    const s = allSettings.find(st => 
+      st.userId === adminId || 
+      st.userId === _id.toString() || 
+      (a.email && st.userId?.toLowerCase() === a.email.toLowerCase())
+    );
+
+    const effectiveDisplayName = s?.displayName || a.displayName || a.name || '';
+    const effectiveRole = s?.role || a.signatureDesignation || a.role || '';
+    const effectiveDept = s?.department || a.signatureDepartment || a.department || '';
+
+    return {
+      ...a,
+      id: adminId,
+      displayName: effectiveDisplayName,
+      name: effectiveDisplayName || a.name,
+      signatureDesignation: effectiveRole,
+      signatureDepartment: effectiveDept,
+      role: a.role || effectiveRole,
+    };
+  });
   return NextResponse.json({ admins: safe });
 }
 

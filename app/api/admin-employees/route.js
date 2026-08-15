@@ -62,17 +62,22 @@ export async function GET() {
 
   const sanitized = uniqueUsers.map(({ password, _id, ...u }) => u);
   
-  // Enrich with DigiLocker verification status
+  // Enrich with DigiLocker verification status + gender
   try {
     const verifications = await db.collection('digilocker_verifications').find({}).toArray();
     const verifyMap = {};
     for (const v of verifications) {
-      verifyMap[v.userId] = { verified: v.verified, verifiedAt: v.verifiedAt };
+      verifyMap[v.userId] = { verified: v.verified, verifiedAt: v.verifiedAt, gender: v.gender || null };
     }
     for (const emp of sanitized) {
       if (verifyMap[emp.id]) {
         emp.digilockerVerified = verifyMap[emp.id].verified;
         emp.digilockerVerifiedAt = verifyMap[emp.id].verifiedAt;
+        emp.gender = verifyMap[emp.id].gender || emp.digilockerProfile?.gender || null;
+      }
+      // Also check digilockerProfile on the user document itself
+      if (!emp.gender && emp.digilockerProfile?.gender) {
+        emp.gender = emp.digilockerProfile.gender;
       }
     }
   } catch (e) {
