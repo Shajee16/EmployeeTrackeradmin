@@ -13,8 +13,8 @@ export default function AdminSettingsPage() {
   // Profile state
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('');
-  const [department, setDepartment] = useState('');
+  const [signatureDesignation, setSignatureDesignation] = useState('');
+  const [signatureDepartment, setSignatureDepartment] = useState('');
   const [profilePic, setProfilePic] = useState(null);
   const [picError, setPicError] = useState('');
   const [picUploading, setPicUploading] = useState(false);
@@ -41,8 +41,8 @@ export default function AdminSettingsPage() {
       if (d.settings) {
         setDisplayName(d.settings.displayName || '');
         setPhone(d.settings.phone || '');
-        setRole(d.settings.role || '');
-        setDepartment(d.settings.department || '');
+        setSignatureDesignation(d.settings.signatureDesignation || d.settings.role || '');
+        setSignatureDepartment(d.settings.signatureDepartment || d.settings.department || '');
         setProfilePic(d.settings.profilePicture || null);
         setNotifs({
           notifLeadAssigned: d.settings.notifLeadAssigned !== false,
@@ -58,7 +58,17 @@ export default function AdminSettingsPage() {
 
   const saveProfile = async () => {
     setLoading(true);
-    await fetch('/api/admin-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'profile', displayName, phone, role, department }) });
+    await fetch('/api/admin-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'profile',
+        displayName,
+        phone,
+        signatureDesignation,
+        signatureDepartment,
+      })
+    });
     if (displayName) {
       ctx?.setUser?.(u => ({ ...u, name: displayName }));
       setUser(u => ({ ...u, name: displayName }));
@@ -271,11 +281,11 @@ export default function AdminSettingsPage() {
                 </div>
                 <div>
                   <label style={label}>Signature Designation / Title</label>
-                  <input style={input} value={role} onChange={e => setRole(e.target.value)} placeholder="e.g., Senior Vice President and Head" />
+                  <input style={input} value={signatureDesignation} onChange={e => setSignatureDesignation(e.target.value)} placeholder="e.g., Managing Director" />
                 </div>
                 <div>
                   <label style={label}>Signature Department / Subtitle</label>
-                  <input style={input} value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g., Education, Training and Assessment" />
+                  <input style={input} value={signatureDepartment} onChange={e => setSignatureDepartment(e.target.value)} placeholder="e.g., Business Development/Product Management" />
                 </div>
                 <div>
                   <label style={label}>Email (read-only)</label>

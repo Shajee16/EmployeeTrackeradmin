@@ -26,8 +26,10 @@ export async function GET() {
   const merged = {
     displayName: settings.displayName || admin?.displayName || admin?.name || '',
     phone: settings.phone || admin?.phone || '',
-    role: settings.role || admin?.signatureDesignation || admin?.role || '',
-    department: settings.department || admin?.signatureDepartment || admin?.department || '',
+    signatureDesignation: settings.signatureDesignation || settings.role || admin?.signatureDesignation || '',
+    signatureDepartment: settings.signatureDepartment || settings.department || admin?.signatureDepartment || admin?.department || '',
+    role: settings.signatureDesignation || settings.role || admin?.signatureDesignation || '',
+    department: settings.signatureDepartment || settings.department || admin?.signatureDepartment || admin?.department || '',
     profilePicture: settings.profilePicture || null,
     notifLeadAssigned: settings.notifLeadAssigned !== false,
     notifNewEmployee: settings.notifNewEmployee !== false,
@@ -59,15 +61,16 @@ export async function PUT(req) {
   if (body.type === 'profile') {
     const cleanDisplayName = sanitizeString(body.displayName || '', 100);
     const cleanPhone = sanitizeString(body.phone || '', 20);
-    const cleanRole = sanitizeString(body.role || '', 100);
-    const cleanDepartment = sanitizeString(body.department || '', 100);
+    const cleanDesignation = sanitizeString(body.signatureDesignation || body.role || '', 100);
+    const cleanDepartment = sanitizeString(body.signatureDepartment || body.department || '', 100);
 
     update.displayName = cleanDisplayName;
     update.phone = cleanPhone;
-    update.role = cleanRole;
-    update.department = cleanDepartment;
+    update.signatureDesignation = cleanDesignation;
+    update.signatureDepartment = cleanDepartment;
 
-    // Sync to the admins collection so Certificates, Admin Management, activity logs etc. stay consistent
+    // Sync to the admins collection so Certificates signature defaults stay consistent
+    // CRITICAL: NEVER overwrite admin.role (which is the RBAC system authorization role 'Super Admin' / 'System Admin')
     const adminsCol = db.collection('admins');
     const adminQuery = {
       $or: [
@@ -84,19 +87,13 @@ export async function PUT(req) {
 
     const adminSet = {
       phone: cleanPhone,
-      signatureDesignation: cleanRole,
+      signatureDesignation: cleanDesignation,
       signatureDepartment: cleanDepartment,
       updatedAt: new Date().toISOString(),
     };
     if (cleanDisplayName) {
       adminSet.displayName = cleanDisplayName;
       adminSet.name = cleanDisplayName;
-    }
-    if (cleanRole) {
-      adminSet.role = cleanRole;
-    }
-    if (cleanDepartment) {
-      adminSet.department = cleanDepartment;
     }
 
     await adminsCol.updateOne(adminQuery, { $set: adminSet });

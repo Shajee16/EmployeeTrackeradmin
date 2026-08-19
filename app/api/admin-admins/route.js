@@ -37,17 +37,18 @@ export async function GET() {
     );
 
     const effectiveDisplayName = s?.displayName || a.displayName || a.name || '';
-    const effectiveRole = s?.role || a.signatureDesignation || a.role || '';
-    const effectiveDept = s?.department || a.signatureDepartment || a.department || '';
+    const effectiveSignatureDesignation = s?.signatureDesignation || a.signatureDesignation || '';
+    const effectiveSignatureDepartment = s?.signatureDepartment || a.signatureDepartment || a.department || '';
 
     return {
       ...a,
       id: adminId,
       displayName: effectiveDisplayName,
       name: effectiveDisplayName || a.name,
-      signatureDesignation: effectiveRole,
-      signatureDepartment: effectiveDept,
-      role: a.role || effectiveRole,
+      signatureDesignation: effectiveSignatureDesignation,
+      signatureDepartment: effectiveSignatureDepartment,
+      department: a.department || 'Administration',
+      role: (a.role === 'Super Admin' || a.role === 'System Admin') ? a.role : (a.role?.toLowerCase().includes('super') ? 'Super Admin' : 'System Admin'),
     };
   });
   return NextResponse.json({ admins: safe });
