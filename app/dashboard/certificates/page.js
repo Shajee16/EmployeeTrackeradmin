@@ -60,41 +60,81 @@ function generateCertBody({ type, category, recipientName, recipientDesignation,
   const pPossCap = isFemale ? 'Her' : isMale ? 'His' : 'Their';
   const pWas = (isFemale || isMale) ? 'was' : 'were';
 
-  const qualities = remarks || `hardworking, diligent, and honest in performing ${pPoss} duties`;
+  const qualities = (remarks || `hardworking, diligent, and honest in performing ${pPoss} duties`).trim().replace(/\.+$/, '');
 
   if (type === 'excellence') {
-    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, has demonstrated exceptional performance, dedication, and outstanding contributions to the organization. ${name} has consistently exceeded expectations, shown remarkable initiative, and inspired excellence among peers.\\n\\nThe management extends its sincere appreciation for the exemplary work and unwavering commitment shown by ${name}. We recognize this achievement under the mentorship of <strong>${guide}</strong>.\\n\\nWe wish ${name} continued success and look forward to many more accomplishments.`;
+    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, has demonstrated exceptional performance, dedication, and outstanding contributions to the organization. ${name} has consistently exceeded expectations, shown remarkable initiative, and inspired excellence among peers.
+
+The management extends its sincere appreciation for the exemplary work and unwavering commitment shown by ${name}. We recognize this achievement under the mentorship of <strong>${guide}</strong>.
+
+We wish ${name} continued success and look forward to many more accomplishments.`;
   }
 
   if (type === 'relieving') {
-    return `This is to certify that <strong>${name}</strong> was employed at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>. ${name} has resigned from the services of the company and is officially relieved from all duties and responsibilities with effect from the close of business hours on <strong>${toDate}</strong>.\\n\\nDuring ${pPoss} tenure with us, ${name} demonstrated professionalism, integrity, and a strong work ethic. ${pSubjectCap} worked under the supervision of <strong>${guide}</strong> and ${pWas} found to be ${qualities}.\\n\\nWe thank ${name} for ${pPoss} contributions and wish ${pObject} the very best in all future professional endeavors.`;
+    return `This is to certify that <strong>${name}</strong> was employed at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>. ${name} has resigned from the services of the company and is officially relieved from all duties and responsibilities with effect from the close of business hours on <strong>${toDate}</strong>.
+
+During ${pPoss} tenure with us, ${name} demonstrated professionalism, integrity, and a strong work ethic. ${pSubjectCap} worked under the supervision of <strong>${guide}</strong> and ${pWas} found to be ${qualities}.
+
+We thank ${name} for ${pPoss} contributions and wish ${pObject} the very best in all future professional endeavors.`;
   }
 
   if (type === 'completion') {
     if (category === 'internship') {
-      return `This is to certify that <strong>${name}</strong> has successfully completed ${pPoss} Internship at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nDuring ${pPoss} internship, ${pSubject} interned under the guidance of <strong>${guide}</strong> and ${pWas} found to be ${qualities}.\\n\\nThe management would like to thank ${name} for the contributions made to the organization and wishes ${pObject} all the best in ${pPoss} future endeavors.`;
+      return `This is to certify that <strong>${name}</strong> has successfully completed ${pPoss} Internship at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.
+
+During ${pPoss} internship, ${pSubject} interned under the guidance of <strong>${guide}</strong> and ${pWas} found to be ${qualities}.
+
+The management would like to thank ${name} for the contributions made to the organization and wishes ${pObject} all the best in ${pPoss} future endeavors.`;
     }
     if (category === 'employment') {
-      return `This is to certify that <strong>${name}</strong> was employed at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nDuring ${pPoss} tenure with us, ${name} demonstrated professionalism, integrity, and a strong work ethic. ${pSubjectCap} worked under the supervision of <strong>${guide}</strong> and ${pWas} found to be ${qualities}.\\n\\nWe wish ${name} continued success in ${pPoss} career and thank ${pObject} for ${pPoss} valuable contributions.`;
+      return `This is to certify that <strong>${name}</strong> was employed at ${company} as ${aOrAn(designation)} <strong>${designation}</strong> from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.
+
+During ${pPoss} tenure with us, ${name} demonstrated professionalism, integrity, and a strong work ethic. ${pSubjectCap} worked under the supervision of <strong>${guide}</strong> and ${pWas} found to be ${qualities}.
+
+We wish ${name} continued success in ${pPoss} career and thank ${pObject} for ${pPoss} valuable contributions.`;
     }
     if (category === 'course') {
-      return `This is to certify that <strong>${name}</strong> has successfully completed the professional development course at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nThe course was conducted under the mentorship of <strong>${guide}</strong>. Throughout the program, ${name} demonstrated ${qualities} and successfully met all the requirements for course completion.\\n\\nWe congratulate ${name} on this accomplishment and wish ${pObject} success in applying ${pPoss} newly acquired knowledge.`;
+      return `This is to certify that <strong>${name}</strong> has successfully completed the professional development course at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.
+
+The course was conducted under the mentorship of <strong>${guide}</strong>. Throughout the program, ${name} demonstrated ${qualities} and successfully met all the requirements for course completion.
+
+We congratulate ${name} on this accomplishment and wish ${pObject} success in applying ${pPoss} newly acquired knowledge.`;
     }
     if (category === 'training') {
-      return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong>, has successfully completed the specialized training program at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nThe training was conducted under the guidance of <strong>${guide}</strong>. During the program, ${name} exhibited ${qualities} and demonstrated strong aptitude in mastering the required skills.\\n\\nThe management congratulates ${name} on the successful completion of this training.`;
+      return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong>, has successfully completed the specialized training program at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.
+
+The training was conducted under the guidance of <strong>${guide}</strong>. During the program, ${name} exhibited ${qualities} and demonstrated strong aptitude in mastering the required skills.
+
+The management congratulates ${name} on the successful completion of this training.`;
     }
     if (category === 'project') {
-      return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong>, has successfully delivered and completed the assigned project at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.\\n\\nThe project was overseen by <strong>${guide}</strong>. Throughout the project lifecycle, ${name} demonstrated ${qualities} and played a pivotal role in its successful delivery.\\n\\nThe management extends its appreciation for the outstanding effort and dedication shown.`;
+      return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong>, has successfully delivered and completed the assigned project at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.
+
+The project was overseen by <strong>${guide}</strong>. Throughout the project lifecycle, ${name} demonstrated ${qualities} and played a pivotal role in its successful delivery.
+
+The management extends its appreciation for the outstanding effort and dedication shown.`;
     }
-    return `This is to certify that <strong>${name}</strong> has successfully completed the assigned program at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong> under the guidance of <strong>${guide}</strong>.\\n\\nDuring the program, ${name} was found to be ${qualities}.\\n\\nWe wish ${name} the very best in all future endeavors.`;
+    return `This is to certify that <strong>${name}</strong> has successfully completed the assigned program at ${company} from <strong>${fromDate}</strong> to <strong>${toDate}</strong> under the guidance of <strong>${guide}</strong>.
+
+During the program, ${name} was found to be ${qualities}.
+
+We wish ${name} the very best in all future endeavors.`;
   }
 
   if (type === 'appreciation') {
-    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, is being recognized for ${pPoss} dedicated service, exceptional commitment, and positive contributions to the organization.\\n\\n${name} has worked under the guidance of <strong>${guide}</strong> and has consistently demonstrated ${qualities}. ${pPossCap} efforts have made a meaningful impact on the team and the organization as a whole.\\n\\nThe management expresses heartfelt gratitude for the outstanding service and looks forward to continued collaboration.`;
+    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, is being recognized for ${pPoss} dedicated service, exceptional commitment, and positive contributions to the organization.
+
+${name} has worked under the guidance of <strong>${guide}</strong> and has consistently demonstrated ${qualities}. ${pPossCap} efforts have made a meaningful impact on the team and the organization as a whole.
+
+The management expresses heartfelt gratitude for the outstanding service and looks forward to continued collaboration.`;
   }
 
   if (type === 'achievement') {
-    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, has achieved a significant milestone that reflects ${pPoss} talent, perseverance, and dedication.\\n\\nThis achievement was accomplished under the mentorship of <strong>${guide}</strong>. During this period, ${name} demonstrated ${qualities} and set a commendable example for peers.\\n\\nThe management congratulates ${name} on this accomplishment and wishes ${pObject} continued success in ${pPoss} professional journey.`;
+    return `This is to certify that <strong>${name}</strong>, serving as ${aOrAn(designation)} <strong>${designation}</strong> at ${company}, has achieved a significant milestone that reflects ${pPoss} talent, perseverance, and dedication.
+
+This achievement was accomplished under the mentorship of <strong>${guide}</strong>. During this period, ${name} demonstrated ${qualities} and set a commendable example for peers.
+
+The management congratulates ${name} on this accomplishment and wishes ${pObject} continued success in ${pPoss} professional journey.`;
   }
 
   return '';
@@ -138,7 +178,12 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
   const title = getCertTitle(type, category);
   const company = companyName || 'Cluso Infolink';
   const body = generateCertBody({ type, category, recipientName, recipientDesignation, respondentName, dateFrom, dateTo, remarks, companyName: company, recipientGender });
-  const bodyHtml = body.replace(/\n/g, '<br/>');
+  const bodyHtml = body
+    .replace(/\\n/g, '\n')
+    .split(/\n\s*\n/)
+    .map(p => p.trim())
+    .filter(Boolean)
+    .join('<br/><br/>');
   const fromDate = dateFrom ? formatDateDisplay(dateFrom) : '';
   const toDate = dateTo ? formatDateDisplay(dateTo) : '';
   const issuedDate = createdAt ? formatDateDisplay(createdAt) : formatDateDisplay(new Date());
