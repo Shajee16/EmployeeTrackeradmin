@@ -16,7 +16,68 @@ const CERT_TYPES = [
   { key: 'appreciation', label: 'Certificate of Appreciation', icon: Heart, color: '#ec4899', desc: 'Express gratitude for dedicated service and efforts' },
   { key: 'achievement', label: 'Certificate of Achievement', icon: Trophy, color: '#8b5cf6', desc: 'Acknowledge a specific milestone or accomplishment' },
   { key: 'relieving', label: 'Relieving Letter', icon: FileText, color: '#3b82f6', desc: 'Issue an official relieving letter for departing employees' },
+  { key: 'loi_employment', label: 'Letter of Intent (Employment)', icon: Send, color: '#0284c7', desc: 'Issue a formal Letter of Intent (LOI) for prospective employees' },
+  { key: 'loi_internship', label: 'Letter of Intent (Internship)', icon: GraduationCap, color: '#6366f1', desc: 'Issue a formal Letter of Intent (LOI) for prospective interns' },
+  { key: 'offer_employment', label: 'Offer Letter (Employment)', icon: Briefcase, color: '#059669', desc: 'Issue an official job offer letter with role and terms' },
+  { key: 'offer_internship', label: 'Offer Letter (Internship)', icon: BookOpen, color: '#d97706', desc: 'Issue an official internship offer letter with stipend & duration' },
 ];
+
+const LETTER_TYPES = ['relieving', 'loi_employment', 'loi_internship', 'offer_employment', 'offer_internship'];
+function isLetterType(type) {
+  return LETTER_TYPES.includes(type);
+}
+
+function getLetterRefPrefix(type) {
+  switch (type) {
+    case 'relieving':
+      return 'CI/HR/RL';
+    case 'loi_employment':
+      return 'CI/HR/LOI-EMP';
+    case 'loi_internship':
+      return 'CI/HR/LOI-INT';
+    case 'offer_employment':
+      return 'CI/HR/OFF-EMP';
+    case 'offer_internship':
+      return 'CI/HR/OFF-INT';
+    default:
+      return 'CI/HR/DOC';
+  }
+}
+
+function getLetterSubject(type, recipientDesignation) {
+  const desig = recipientDesignation ? ` — ${recipientDesignation}` : '';
+  switch (type) {
+    case 'relieving':
+      return 'Subject: Relieving Letter & Experience Certificate';
+    case 'loi_employment':
+      return `Subject: Letter of Intent (Employment)${desig}`;
+    case 'loi_internship':
+      return `Subject: Letter of Intent — Internship Program${desig}`;
+    case 'offer_employment':
+      return `Subject: Offer of Employment${desig}`;
+    case 'offer_internship':
+      return `Subject: Offer of Internship${desig}`;
+    default:
+      return 'Subject: Official Document';
+  }
+}
+
+function getLetterFilenameSuffix(type) {
+  switch (type) {
+    case 'relieving':
+      return 'Relieving_Letter';
+    case 'loi_employment':
+      return 'Letter_of_Intent_Employment';
+    case 'loi_internship':
+      return 'Letter_of_Intent_Internship';
+    case 'offer_employment':
+      return 'Offer_Letter_Employment';
+    case 'offer_internship':
+      return 'Offer_Letter_Internship';
+    default:
+      return 'Official_Document';
+  }
+}
 
 const COMPLETION_CATEGORIES = [
   { key: 'internship', label: 'Internship Completion', icon: GraduationCap, desc: 'For interns who completed their internship program' },
@@ -137,6 +198,46 @@ This achievement was accomplished under the mentorship of <strong>${guide}</stro
 The management congratulates ${name} on this accomplishment and wishes ${pObject} continued success in ${pPoss} professional journey.`;
   }
 
+  if (type === 'loi_employment') {
+    return `We are pleased to issue this <strong>Letter of Intent</strong> to express our formal intention to offer you the position of <strong>${designation}</strong> with <strong>${company}</strong>, effective from your anticipated joining date of <strong>${fromDate}</strong>.
+
+Based on our discussions and assessment of your qualifications, skills, and background, we believe your experience and capabilities make you an excellent fit for our organization. In this position, you will be working under the leadership of <strong>${guide}</strong>.
+
+This Letter of Intent confirms our mutual understanding and commitment prior to final onboarding. A formal Appointment Letter outlining your detailed compensation structure, company benefits, and standard service conditions will be issued following your acceptance of this letter. ${remarks ? `Special Notes & Terms: ${remarks}.` : `We trust that you will contribute positively towards our company goals with integrity and dedication.`}
+
+Please review this letter, sign the duplicate copy to confirm your acceptance, and return it to our HR department to initiate the formal documentation.`;
+  }
+
+  if (type === 'loi_internship') {
+    return `We are pleased to issue this <strong>Letter of Intent</strong> to confirm our intention to offer you an internship position as <strong>${designation}</strong> with <strong>${company}</strong> for the duration from <strong>${fromDate}</strong> to <strong>${toDate}</strong>.
+
+We were impressed by your academic background, enthusiasm, and potential during our evaluation. During your internship period, you will be mentored by <strong>${guide}</strong>, gaining valuable hands-on experience, real-world project exposure, and collaborative skills in a fast-paced environment.
+
+This Letter of Intent acknowledges our commitment to your professional learning and development. An Internship Agreement outlining program guidelines, working schedule, and stipendiary details will be issued upon receipt of your formal acceptance. ${remarks ? `Program Details: ${remarks}.` : `We look forward to your proactive contributions and dedication during the program.`}
+
+Please confirm your acceptance of this letter by returning a signed copy to HR at your earliest convenience.`;
+  }
+
+  if (type === 'offer_employment') {
+    return `On behalf of <strong>${company}</strong>, we are delighted to formally offer you employment for the position of <strong>${designation}</strong>. Your appointment will commence on <strong>${fromDate}</strong>, and you will report directly to <strong>${guide}</strong>.
+
+We were thoroughly impressed by your credentials, professional achievements, and potential to contribute significantly to our ongoing expansion and operational success. We are confident that you will find your role both rewarding and professionally enriching.
+
+Your employment will be governed by company policies, service rules, code of conduct, and confidentiality obligations. ${remarks ? `Terms of Offer & Compensation: ${remarks}.` : `Detailed compensation details, employment covenants, and benefits will be set forth in your comprehensive employment agreement.`}
+
+Please sign and return the duplicate copy of this letter along with the requested onboarding documents to signify your acceptance of this offer. We warmly welcome you to the ${company} team and look forward to building a great future together.`;
+  }
+
+  if (type === 'offer_internship') {
+    return `We are delighted to formally offer you an internship as <strong>${designation}</strong> with <strong>${company}</strong>. Your internship tenure will be from <strong>${fromDate}</strong> to <strong>${toDate}</strong> under the mentorship and supervision of <strong>${guide}</strong>.
+
+This internship is designed to provide you with practical training, structured mentorship, and hands-on participation in live projects. You are expected to adhere to all workplace guidelines, professional standards, and confidentiality agreements applicable to company personnel.
+
+${remarks ? `Stipend & Program Conditions: ${remarks}.` : `Stipend and performance review terms will be governed as per company internship policies.`} Upon successful completion of your internship tenure, you will be awarded an official Certificate of Completion.
+
+Please confirm your acceptance of this internship offer by signing and returning this letter. We are excited to welcome you aboard and look forward to an inspiring and fruitful association with ${company}.`;
+  }
+
   return '';
 }
 
@@ -167,6 +268,10 @@ function getCertTitle(type, category) {
     appreciation: 'Certificate of Appreciation',
     achievement: 'Certificate of Achievement',
     relieving: 'Relieving Letter',
+    loi_employment: 'Letter of Intent (Employment)',
+    loi_internship: 'Letter of Intent (Internship)',
+    offer_employment: 'Offer Letter (Employment)',
+    offer_internship: 'Offer Letter (Internship)',
   };
   return titles[type] || 'Certificate';
 }
@@ -188,9 +293,11 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
   const toDate = dateTo ? formatDateDisplay(dateTo) : '';
   const issuedDate = createdAt ? formatDateDisplay(createdAt) : formatDateDisplay(new Date());
 
-  if (type === 'relieving') {
-    const formattedDate = toDate || formatDateDisplay(new Date());
-    const refId = recipientId ? `CI/HR/RL/${recipientId}` : `CI/HR/RL/${Math.floor(1000 + Math.random() * 9000)}`;
+  if (isLetterType(type)) {
+    const formattedDate = (type === 'relieving') ? (toDate || formatDateDisplay(createdAt || new Date())) : (createdAt ? formatDateDisplay(createdAt) : formatDateDisplay(new Date()));
+    const refPrefix = getLetterRefPrefix(type);
+    const refId = recipientId ? `${refPrefix}/${recipientId}` : `${refPrefix}/${Math.floor(1000 + Math.random() * 9000)}`;
+    const subjectLine = getLetterSubject(type, recipientDesignation);
 
     if (template === 'classic') {
       return `
@@ -234,7 +341,7 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
             <!-- Subject -->
             <div style="text-align: center; margin-bottom: 28px;">
               <span style="font-size: 13px; font-weight: 700; color: #2a1f14; border-bottom: 1.5px solid #2a1f14; padding-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">
-                Subject: Relieving Letter & Experience Certificate
+                ${subjectLine}
               </span>
             </div>
 
@@ -319,7 +426,7 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
             <!-- Subject -->
             <div style="text-align: center; margin-bottom: 24px;">
               <span style="font-size: 13px; font-weight: 800; color: #0f172a; border-bottom: 2px solid #3b82f6; padding-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px;">
-                Subject: Relieving Letter & Experience Certificate
+                ${subjectLine}
               </span>
             </div>
 
@@ -408,7 +515,7 @@ function renderCertificateHTML({ template, type, category, recipientName, recipi
             <!-- Subject -->
             <div style="text-align: center; margin-bottom: 24px;">
               <span style="font-size: 13px; font-weight: 700; color: #1e1b4b; border-bottom: 1.5px solid #c9a84c; padding-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px;">
-                Subject: Relieving Letter & Experience Certificate
+                ${subjectLine}
               </span>
             </div>
 
@@ -852,7 +959,17 @@ export default function CertificatesPage() {
     if (certType && !remarks) {
       const g = (selectedRecipient?.gender || '').toLowerCase().trim();
       const pPoss = (g === 'female' || g === 'f') ? 'her' : (g === 'male' || g === 'm') ? 'his' : 'their';
-      setRemarks(`hardworking, diligent, and honest in performing ${pPoss} duties`);
+      if (certType === 'offer_employment') {
+        setRemarks('Annual CTC: ₹6,00,000 | Probation: 3 Months | Full-time on-site');
+      } else if (certType === 'offer_internship') {
+        setRemarks('Monthly Stipend: ₹15,000 | Duration: 6 Months | Hybrid mode');
+      } else if (certType === 'loi_employment') {
+        setRemarks('Proposed CTC: ₹6,00,000 | Subject to background verification and document clearance');
+      } else if (certType === 'loi_internship') {
+        setRemarks('Monthly Stipend: ₹12,000 | Hands-on project mentorship with potential PPO conversion');
+      } else {
+        setRemarks(`hardworking, diligent, and honest in performing ${pPoss} duties`);
+      }
     }
   }, [certType]);
 
@@ -1091,7 +1208,7 @@ export default function CertificatesPage() {
       const element = document.getElementById('certificate-download-target');
       if (element) {
         const pdf = await captureElementToPdfBase64(element, cert.template);
-        const filename = `${cert.recipientName.replace(/\s+/g, '_')}_${cert.type === 'relieving' ? 'Relieving_Letter' : 'Certificate'}.pdf`;
+        const filename = `${cert.recipientName.replace(/\s+/g, '_')}_${isLetterType(cert.type) ? getLetterFilenameSuffix(cert.type) : 'Certificate'}.pdf`;
         pdf.save(filename);
         showMsg('PDF downloaded successfully');
       } else {
@@ -1776,25 +1893,31 @@ export default function CertificatesPage() {
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div>
-                          <label className="form-label">From Date</label>
+                          <label className="form-label">{isLetterType(certType) && !['relieving', 'loi_internship', 'offer_internship'].includes(certType) ? 'Joining / Effective Date' : 'From Date'}</label>
                           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
                         </div>
                         <div>
-                          <label className="form-label">To Date</label>
+                          <label className="form-label">{isLetterType(certType) && !['relieving', 'loi_internship', 'offer_internship'].includes(certType) ? 'Valid Till / Expiry (Optional)' : 'To Date'}</label>
                           <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
                         </div>
                       </div>
                     </div>
                     <div>
-                      <label className="form-label">Qualities / Remarks</label>
+                      <label className="form-label">{isLetterType(certType) ? 'Terms / Remarks / Stipend / CTC' : 'Qualities / Remarks'}</label>
                       <textarea
                         value={remarks}
                         onChange={e => setRemarks(e.target.value)}
                         rows={3}
-                        placeholder="e.g., hardworking, diligent, and honest in performing their duties"
+                        placeholder={
+                          certType === 'offer_employment' ? 'e.g., Annual CTC: ₹6,50,000, Probation: 3 Months, Work Location: Bangalore' :
+                          certType === 'offer_internship' ? 'e.g., Monthly Stipend: ₹15,000, Working Hours: 9:30 AM - 6:30 PM, Hybrid mode' :
+                          certType === 'loi_employment' ? 'e.g., Proposed CTC: ₹6,00,000, Subject to background verification and document submission' :
+                          certType === 'loi_internship' ? 'e.g., Monthly Stipend: ₹12,000, Full-time internship with potential PPO conversion' :
+                          'e.g., hardworking, diligent, and honest in performing their duties'
+                        }
                         style={{ resize: 'vertical' }}
                       />
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 6 }}>These qualities will appear in the certificate body text.</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 6 }}>These terms will appear in the official document body text.</p>
                     </div>
 
                     {/* Summary */}
@@ -1887,7 +2010,7 @@ export default function CertificatesPage() {
                     padding: 36, borderRadius: 14, border: '1px solid var(--surface-border)',
                     marginBottom: 28, overflow: 'auto',
                   }}>
-                    <div id="certificate-pdf-target" style={{ width: certType === 'relieving' ? '640px' : '800px', margin: '0 auto' }}>
+                    <div id="certificate-pdf-target" style={{ width: isLetterType(certType) ? '640px' : '800px', margin: '0 auto' }}>
                       <div dangerouslySetInnerHTML={{ __html: certificateHtml }} />
                     </div>
                   </div>
@@ -1980,8 +2103,8 @@ export default function CertificatesPage() {
 
       {/* Hidden container for PDF download from history */}
       {downloadingCert && (
-        <div style={{ position: 'fixed', left: '-9999px', top: '0px', width: downloadingCert.type === 'relieving' ? '640px' : '800px', height: downloadingCert.type === 'relieving' ? '900px' : '600px', overflow: 'visible', zIndex: -9999 }}>
-          <div id="certificate-download-target" style={{ width: downloadingCert.type === 'relieving' ? '640px' : '800px', height: downloadingCert.type === 'relieving' ? '900px' : '600px' }}>
+        <div style={{ position: 'fixed', left: '-9999px', top: '0px', width: isLetterType(downloadingCert.type) ? '640px' : '800px', height: isLetterType(downloadingCert.type) ? '900px' : '600px', overflow: 'visible', zIndex: -9999 }}>
+          <div id="certificate-download-target" style={{ width: isLetterType(downloadingCert.type) ? '640px' : '800px', height: isLetterType(downloadingCert.type) ? '900px' : '600px' }}>
             <div dangerouslySetInnerHTML={{ __html: renderCertificateHTML(downloadingCert) }} />
           </div>
         </div>
