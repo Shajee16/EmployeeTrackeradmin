@@ -45,6 +45,7 @@ export default function CandidateRosterPage() {
   const [onboardError, setOnboardError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [digiModal, setDigiModal] = useState(null); // candidate's digilockerProfile
+  const [refetchingDocs, setRefetchingDocs] = useState({});
   const [resumeModal, setResumeModal] = useState(null); // { name, resume }
   const [departments, setDepartments] = useState([]);
 
@@ -75,6 +76,371 @@ export default function CandidateRosterPage() {
       console.error('Failed to fetch departments:', err);
     }
   }, []);
+
+  const refetchDocument = async (candidateId, docIndex, docName) => {
+    const key = `${candidateId}-${docIndex}`;
+    setRefetchingDocs(prev => ({ ...prev, [key]: true }));
+    try {
+      const res = await fetch('/api/admin-digilocker/refetch-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: candidateId, docIndex })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Successfully fetched original file for "${docName}" from DigiLocker!`);
+        setDigiModal(prev => {
+          if (!prev || !prev.profile) return prev;
+          const rawDocs = Array.isArray(prev.profile.documents) ? prev.profile.documents : (prev.profile.documents?.items || []);
+          const updatedDocs = [...rawDocs];
+          if (updatedDocs[docIndex]) {
+            updatedDocs[docIndex] = {
+              ...updatedDocs[docIndex],
+              fileData: data.fileData,
+              fileMimeType: data.fileMimeType
+            };
+          }
+          return { ...prev, profile: { ...prev.profile, documents: updatedDocs } };
+        });
+        setCandidates(prev => prev.map(c => {
+          if (c._id === candidateId || c.id === candidateId) {
+            const rawDocs = Array.isArray(c.digilockerProfile?.documents) ? c.digilockerProfile.documents : (c.digilockerProfile?.documents?.items || []);
+            const updatedDocs = [...rawDocs];
+            if (updatedDocs[docIndex]) {
+              updatedDocs[docIndex] = {
+                ...updatedDocs[docIndex],
+                fileData: data.fileData,
+                fileMimeType: data.fileMimeType
+              };
+            }
+            return { ...c, digilockerProfile: { ...c.digilockerProfile, documents: updatedDocs } };
+          }
+          return c;
+        }));
+      } else {
+        if (data.notifiedCandidate) {
+          alert(`📩 Re-verification request sent!\n\n${data.error}\n\nThe candidate will see a notification on their dashboard to re-verify DigiLocker.`);
+        } else {
+          alert(`Error: ${data.error || 'Failed to fetch file'}`);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error fetching file. Please try again.');
+    } finally {
+      setRefetchingDocs(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  // Helper to render certificate data fields nicely
+  const renderCertFields = (data, depth = 0) => {
+    if (!data || typeof data !== 'object') return null;
+    if (data.rawXml) {
+      return (
+        <pre style={{ fontSize: '0.72rem', color: 'var(--ink, #1e293b)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace', margin: 0, maxHeight: 250, overflowY: 'auto', background: 'var(--bg, #f8fafc)', padding: 10, borderRadius: 8, border: '1px solid var(--border-color, #e2e8f0)' }}>
+          {data.rawXml}
+        </pre>
+      );
+    }
+    const entries = Object.entries(data).filter(([k, v]) =>
+      v !== null && v !== undefined && v !== '' && k !== '_id' && k !== 'Signature'
+    );
+    if (entries.length === 0) return null;
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: depth === 0 ? 'repeat(auto-fill, minmax(220px, 1fr))' : '1fr', gap: depth === 0 ? 8 : 4, paddingLeft: depth > 0 ? 12 : 0 }}>
+        {entries.map(([key, val]) => {
+          const label = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/@/g, '').trim();
+          if (val && typeof val === 'object' && !Array.isArray(val)) {
+            return (
+              <div key={key} style={{ gridColumn: '1 / -1' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: depth === 0 ? 8 : 4, marginBottom: 4 }}>{label}</div>
+                {renderCertFields(val, depth + 1)}
+              </div>
+            );
+          }
+          if (Array.isArray(val)) {
+            return (
+              <div key={key} style={{ gridColumn: '1 / -1' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: depth === 0 ? 8 : 4, marginBottom: 4 }}>{label}</div>
+                {val.map((item, vi) => (
+                  <div key={vi} style={{ marginBottom: 6, paddingLeft: 12, borderLeft: '2px solid var(--border-color, #e2e8f0)' }}>
+                    {typeof item === 'object' ? renderCertFields(item, depth + 1) : (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--ink, #1e293b)' }}>{String(item)}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          }
+          return (
+            <div key={key} style={{ padding: '6px 10px', background: 'var(--bg, #f8fafc)', borderRadius: 6, border: '1px solid var(--border-color, #e2e8f0)' }}>
+              <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'var(--ink-soft, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ink, #1e293b)', wordBreak: 'break-word' }}>{String(val)}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const generateCertificatePdf = (doc) => {
+    let certName = doc.name || doc.description || 'Document';
+    let certType = doc.doctype || '';
+    let certNumber = '';
+    let certStatus = '';
+    let issueDate = doc.date || '';
+    let orgName = doc.issuer || '';
+    let personName = '';
+    let personDob = '';
+    let personGender = '';
+    let personRegnNo = '';
+    let personAbcId = '';
+    let personFather = '';
+    let personMother = '';
+    let personPhoto = '';
+    let certDataRows = '';
+    let subjectsHtml = '';
+    let courseHtml = '';
+    let examHtml = '';
+    let schoolHtml = '';
+    let perfHtml = '';
+    let qrBase64 = '';
+
+    const rawXml = doc.certificateData?.rawXml || '';
+    if (rawXml) {
+      try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(rawXml, 'text/xml');
+        const cert = xmlDoc.querySelector('Certificate');
+        if (cert) {
+          certName = cert.getAttribute('name') || certName;
+          certType = cert.getAttribute('type') || certType;
+          certNumber = cert.getAttribute('number') || '';
+          certStatus = cert.getAttribute('status') || '';
+          issueDate = cert.getAttribute('issueDate') || cert.getAttribute('issuedAt') || issueDate;
+        }
+        const org = xmlDoc.querySelector('IssuedBy Organization');
+        if (org) orgName = org.getAttribute('name') || orgName;
+        const person = xmlDoc.querySelector('IssuedTo Person');
+        if (person) {
+          personName = person.getAttribute('name') || '';
+          personDob = person.getAttribute('dob') || '';
+          personGender = person.getAttribute('gender') || '';
+          personRegnNo = person.getAttribute('regnNo') || person.getAttribute('rroll') || '';
+          personAbcId = person.getAttribute('abcAccountId') || '';
+          personFather = person.getAttribute('fatherName') || person.getAttribute('swd') || '';
+          personMother = person.getAttribute('motherName') || '';
+          const photoEl = person.querySelector('Photo');
+          if (photoEl && photoEl.textContent) {
+            personPhoto = photoEl.textContent.trim();
+          }
+        }
+        // School / Institution info
+        const schoolEl = xmlDoc.querySelector('School');
+        if (schoolEl) {
+          const sn = schoolEl.getAttribute('name') || '';
+          const sc = schoolEl.getAttribute('code') || '';
+          if (sn) {
+            schoolHtml = `<div class="section"><div class="section-head">Institution / School</div><div class="info-grid"><div class="info-card" style="grid-column:1/-1"><div class="lbl">School Name</div><div class="val">${sn}${sc ? ` (Code: ${sc})` : ''}</div></div></div></div>`;
+          }
+        }
+        // Performance summary
+        const perfEl = xmlDoc.querySelector('Performance');
+        if (perfEl) {
+          const res = perfEl.getAttribute('result') || '';
+          const tot = perfEl.getAttribute('marksTotal') || '';
+          const max = perfEl.getAttribute('marksMax') || '';
+          if (res || tot) {
+            perfHtml = `<div class="section"><div class="section-head">Performance Summary</div><div class="info-grid">`;
+            if (res) perfHtml += `<div class="info-card"><div class="lbl">Result</div><div class="val" style="color:#16a34a;font-weight:700">${res}</div></div>`;
+            if (tot) perfHtml += `<div class="info-card"><div class="lbl">Total Marks</div><div class="val" style="font-weight:700">${tot}${max ? ` / ${max}` : ''}</div></div>`;
+            perfHtml += `</div></div>`;
+          }
+        }
+        // Course info
+        const courseEl = xmlDoc.querySelector('Course');
+        if (courseEl) {
+          const cn = courseEl.getAttribute('courseName') || '';
+          const spec = courseEl.querySelector('Stream')?.getAttribute('name') || courseEl.getAttribute('specializationMajor') || '';
+          if (cn || spec) {
+            courseHtml = `<div class="section"><div class="section-head">Course Information</div><div class="info-grid">`;
+            if (cn) courseHtml += `<div class="info-card"><div class="lbl">Programme</div><div class="val">${cn}</div></div>`;
+            if (spec) courseHtml += `<div class="info-card" style="grid-column:1/-1"><div class="lbl">Specialization</div><div class="val">${spec}</div></div>`;
+            courseHtml += `</div></div>`;
+          }
+        }
+        // Examination info
+        const examEl = xmlDoc.querySelector('Examination');
+        if (examEl) {
+          const sem = examEl.getAttribute('sem') || '';
+          const month = examEl.getAttribute('month') || '';
+          const year = examEl.getAttribute('year') || '';
+          const cgpa = examEl.getAttribute('cgpa') || '';
+          const examType = examEl.getAttribute('examType') || '';
+          examHtml = `<div class="section"><div class="section-head">Examination</div><div class="info-grid">`;
+          if (sem) examHtml += `<div class="info-card"><div class="lbl">Semester</div><div class="val">${sem}</div></div>`;
+          if (month && year) examHtml += `<div class="info-card"><div class="lbl">Session</div><div class="val">${month} ${year}</div></div>`;
+          if (cgpa) examHtml += `<div class="info-card"><div class="lbl">CGPA</div><div class="val" style="font-size:18px;color:#4f46e5">${cgpa}</div></div>`;
+          if (examType) examHtml += `<div class="info-card"><div class="lbl">Type</div><div class="val">${examType}</div></div>`;
+          examHtml += `</div></div>`;
+        }
+        // Subjects table
+        const subjects = xmlDoc.querySelectorAll('Subject');
+        if (subjects.length > 0) {
+          const hasMarks = Array.from(subjects).some(s => s.getAttribute('marksTotal') || s.getAttribute('marksTheory'));
+          if (hasMarks) {
+            subjectsHtml = `<div class="section"><div class="section-head">Subjects &amp; Marks</div><table class="subjects"><thead><tr><th>Code</th><th>Subject</th><th style="text-align:center">Theory</th><th style="text-align:center">Practical</th><th style="text-align:center">Total</th><th style="text-align:center">Grade</th></tr></thead><tbody>`;
+            subjects.forEach(sub => {
+              const code = sub.getAttribute('code') || '';
+              const nm = sub.getAttribute('name') || '';
+              const th = sub.getAttribute('marksTheory') || '-';
+              const pr = sub.getAttribute('marksPractical') || '-';
+              const tot = sub.getAttribute('marksTotal') || '-';
+              const grade = sub.getAttribute('grade') || '';
+              const gc = grade.startsWith('A') ? '#16a34a' : grade.startsWith('B') ? '#2563eb' : '#1e293b';
+              subjectsHtml += `<tr><td style="font-family:monospace;font-size:11px;color:#64748b">${code}</td><td>${nm}</td><td style="text-align:center">${th}</td><td style="text-align:center">${pr}</td><td style="text-align:center;font-weight:700">${tot}</td><td style="text-align:center"><span style="background:${gc}15;color:${gc};padding:2px 10px;border-radius:6px;font-weight:700;font-size:12px">${grade}</span></td></tr>`;
+            });
+            subjectsHtml += `</tbody></table></div>`;
+          } else {
+            subjectsHtml = `<div class="section"><div class="section-head">Subjects &amp; Grades</div><table class="subjects"><thead><tr><th>Code</th><th>Subject</th><th>Grade</th><th>GP</th><th>Max</th></tr></thead><tbody>`;
+            subjects.forEach(sub => {
+              const code = sub.getAttribute('code') || '';
+              const nm = sub.getAttribute('name') || '';
+              const grade = sub.getAttribute('grade') || '';
+              const gp = sub.getAttribute('gp') || '';
+              const mm = sub.getAttribute('marksMax') || '';
+              const gc = grade === 'O' ? '#16a34a' : grade === 'A+' ? '#2563eb' : grade === 'A' ? '#7c3aed' : '#1e293b';
+              subjectsHtml += `<tr><td style="font-family:monospace;font-size:11px;color:#64748b">${code}</td><td>${nm}</td><td style="text-align:center"><span style="background:${gc}11;color:${gc};padding:2px 10px;border-radius:6px;font-weight:700;font-size:12px">${grade}</span></td><td style="text-align:center;font-weight:700">${gp}</td><td style="text-align:center">${mm}</td></tr>`;
+            });
+            subjectsHtml += `</tbody></table></div>`;
+          }
+        }
+        const certDataEl = xmlDoc.querySelector('CertificateData');
+        if (certDataEl && !xmlDoc.querySelector('Subject')) {
+          const children = certDataEl.children;
+          for (let ci = 0; ci < children.length; ci++) {
+            const child = children[ci];
+            const tagName = child.tagName;
+            if (['OrgDetails','Examination','Course','Performance','School'].includes(tagName)) continue;
+            const attrs = child.attributes;
+            for (let ai = 0; ai < attrs.length; ai++) {
+              const a = attrs[ai];
+              if (a.value) certDataRows += `<tr><td class="label">${tagName} — ${a.name.replace(/([A-Z])/g, ' $1').trim()}</td><td class="value">${a.value}</td></tr>`;
+            }
+          }
+        }
+        const qrEl = xmlDoc.querySelector('QRMeta');
+        if (qrEl && qrEl.textContent) qrBase64 = qrEl.textContent.trim();
+      } catch (parseErr) { console.error('XML parse error:', parseErr); }
+    } else if (doc.certificateData && typeof doc.certificateData === 'object') {
+      const buildRows = (obj, prefix = '') => {
+        if (!obj || typeof obj !== 'object') return '';
+        return Object.entries(obj).filter(([k, v]) => v != null && v !== '' && k !== '_id' && k !== 'Signature').map(([k, v]) => {
+          const lbl = (prefix ? prefix + ' › ' : '') + k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+          if (typeof v === 'object' && !Array.isArray(v)) return buildRows(v, lbl);
+          return `<tr><td class="label">${lbl}</td><td class="value">${String(v)}</td></tr>`;
+        }).join('');
+      };
+      certDataRows = buildRows(doc.certificateData);
+    }
+
+    const statusBadge = certStatus === 'A' ? '<span style="background:#dcfce7;color:#16a34a;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700">ACTIVE</span>' : certStatus ? `<span style="background:#fef3c7;color:#d97706;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700">${certStatus}</span>` : '';
+
+    const html = `<!DOCTYPE html><html><head><title>${certName}</title><style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+      * { margin:0; padding:0; box-sizing:border-box; }
+      body { font-family:'Inter',sans-serif; color:#1e293b; background:#fff; }
+      .page { max-width:700px; margin:0 auto; padding:40px; }
+      .banner { background:linear-gradient(135deg,#4f46e5,#7c3aed,#6366f1); color:#fff; padding:28px 32px; border-radius:16px; margin-bottom:28px; position:relative; overflow:hidden; }
+      .banner::after { content:''; position:absolute; top:-40px; right:-40px; width:160px; height:160px; background:rgba(255,255,255,0.06); border-radius:50%; }
+      .banner h1 { font-size:22px; font-weight:800; letter-spacing:-0.02em; margin-bottom:4px; }
+      .banner .sub { font-size:13px; opacity:0.85; font-weight:400; }
+      .banner .badge { position:absolute; top:28px; right:32px; background:rgba(255,255,255,0.18); backdrop-filter:blur(4px); padding:6px 16px; border-radius:8px; font-size:12px; font-weight:700; letter-spacing:0.06em; }
+      .section { margin-bottom:20px; }
+      .section-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#6366f1; margin-bottom:10px; padding-bottom:6px; border-bottom:2px solid #e0e7ff; }
+      .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+      .info-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 16px; }
+      .info-card .lbl { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin-bottom:3px; }
+      .info-card .val { font-size:14px; font-weight:600; color:#1e293b; word-break:break-word; }
+      table { width:100%; border-collapse:collapse; margin-top:8px; }
+      td.label { padding:8px 14px; font-weight:600; color:#475569; border:1px solid #e2e8f0; width:40%; background:#f8fafc; font-size:12px; }
+      td.value { padding:8px 14px; border:1px solid #e2e8f0; font-size:13px; color:#1e293b; font-weight:500; }
+      table.subjects { font-size:12px; border:none; }
+      table.subjects th { background:#4f46e5; color:#fff; padding:10px 12px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+      table.subjects th:first-child { border-radius:8px 0 0 0; }
+      table.subjects th:last-child { border-radius:0 8px 0 0; }
+      table.subjects td { padding:10px 12px; border-bottom:1px solid #f1f5f9; border-left:none; border-right:none; }
+      table.subjects tr:nth-child(even) { background:#f8fafc; }
+      .qr-section { display:flex; align-items:center; gap:20px; margin-top:16px; padding:16px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0; }
+      .qr-section img { width:100px; height:100px; border-radius:6px; }
+      .qr-section .qr-text { font-size:11px; color:#64748b; line-height:1.6; }
+      .footer { margin-top:32px; padding-top:16px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; }
+      .footer .left { font-size:10px; color:#94a3b8; }
+      .footer .right { font-size:10px; color:#6366f1; font-weight:600; }
+      @media print { .page { padding:20px; } .banner { break-inside:avoid; } }
+    </style></head><body><div class="page">
+      <div class="banner">
+        <h1>${certName}</h1>
+        <div class="sub">${orgName}${certNumber ? ' · ' + certNumber : ''}</div>
+        <div class="badge">${certType}</div>
+      </div>
+
+      ${personName ? `<div class="section">
+        <div class="section-head">Certificate Holder</div>
+        <div style="display:flex;gap:20px;align-items:flex-start">
+          ${personPhoto ? `<div style="width:90px;height:115px;border-radius:8px;overflow:hidden;border:1px solid #cbd5e1;flex-shrink:0"><img src="${personPhoto.startsWith('data:') ? personPhoto : `data:image/jpeg;base64,${personPhoto}`}" style="width:100%;height:100%;object-fit:cover" alt="Photo"/></div>` : ''}
+          <div class="info-grid" style="flex:1">
+            <div class="info-card"><div class="lbl">Full Name</div><div class="val">${personName}</div></div>
+            ${personDob ? `<div class="info-card"><div class="lbl">Date of Birth</div><div class="val">${personDob}</div></div>` : ''}
+            ${personGender ? `<div class="info-card"><div class="lbl">Gender</div><div class="val">${personGender}</div></div>` : ''}
+            ${personFather ? `<div class="info-card"><div class="lbl">Father's Name</div><div class="val">${personFather}</div></div>` : ''}
+            ${personMother ? `<div class="info-card"><div class="lbl">Mother's Name</div><div class="val">${personMother}</div></div>` : ''}
+            ${personRegnNo ? `<div class="info-card"><div class="lbl">Registration / Roll No</div><div class="val">${personRegnNo}</div></div>` : ''}
+            ${certNumber && certNumber !== personRegnNo ? `<div class="info-card"><div class="lbl">Document Number</div><div class="val">${certNumber}</div></div>` : ''}
+            ${personAbcId ? `<div class="info-card"><div class="lbl">ABC Account ID</div><div class="val">${personAbcId}</div></div>` : ''}
+          </div>
+        </div>
+      </div>` : ''}
+
+      <div class="section">
+        <div class="section-head">Document Information</div>
+        <div class="info-grid">
+          <div class="info-card"><div class="lbl">Issuing Authority</div><div class="val">${orgName}</div></div>
+          <div class="info-card"><div class="lbl">Document Type</div><div class="val">${certName} (${certType})</div></div>
+          ${issueDate ? `<div class="info-card"><div class="lbl">Date</div><div class="val">${issueDate}</div></div>` : ''}
+          <div class="info-card"><div class="lbl">Status</div><div class="val">${statusBadge || 'Verified'}</div></div>
+        </div>
+      </div>
+
+      ${schoolHtml}
+      ${courseHtml}
+      ${examHtml}
+      ${perfHtml}
+      ${subjectsHtml}
+
+      ${certDataRows ? `<div class="section">
+        <div class="section-head">Certificate Details</div>
+        <table>${certDataRows}</table>
+      </div>` : ''}
+
+      ${qrBase64 ? `<div class="qr-section">
+        <img src="data:image/png;base64,${qrBase64}" alt="QR Code"/>
+        <div class="qr-text"><strong>Verification QR Code</strong><br/>Scan to verify this document on DigiLocker.<br/>URI: ${doc.uri || ''}</div>
+      </div>` : ''}
+
+      <div class="footer">
+        <div class="left">Generated from DigiLocker verified data · ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+        <div class="right">DigiLocker Verified ✓</div>
+      </div>
+    </div></body></html>`;
+
+    const printWin = window.open('', '_blank', 'width=800,height=700');
+    if (printWin) {
+      printWin.document.write(html);
+      printWin.document.close();
+      setTimeout(() => { printWin.print(); }, 500);
+    }
+  };
 
   useEffect(() => {
     fetchCandidates();
@@ -844,7 +1210,12 @@ export default function CandidateRosterPage() {
                       onClick={(e) => {
                         if (hasDigiLocker) {
                           e.stopPropagation();
-                          setDigiModal({ name: candidate.name, profile: candidate.digilockerProfile });
+                          setDigiModal({
+                            name: candidate.name,
+                            profile: candidate.digilockerProfile,
+                            candidateId: candidate._id,
+                            id: candidate.onboardedEmployeeId || candidate._id,
+                          });
                         }
                       }}
                       onMouseEnter={(e) => {
@@ -1357,8 +1728,8 @@ export default function CandidateRosterPage() {
             <div
               style={{
                 width: '100%',
-                maxWidth: '560px',
-                maxHeight: '85vh',
+                maxWidth: '680px',
+                maxHeight: '90vh',
                 background: 'var(--surface, #fff)',
                 borderRadius: '20px',
                 overflow: 'hidden',
@@ -1541,7 +1912,7 @@ export default function CandidateRosterPage() {
 
                 {/* Issued Documents */}
                 {docs.length > 0 && (
-                  <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ marginBottom: '1.25rem' }}>
                     <h4
                       style={{
                         margin: '0 0 0.6rem',
@@ -1558,112 +1929,128 @@ export default function CandidateRosterPage() {
                       <FileText size={14} />
                       Issued Documents ({docs.length})
                     </h4>
-                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {docs.map((doc, idx) => (
-                        <div
+                        <details
                           key={idx}
                           style={{
-                            padding: '0.6rem 1rem',
-                            borderRadius: '10px',
-                            background: 'var(--bg, #f8fafc)',
+                            borderRadius: 10,
                             border: '1px solid var(--border-color, #e2e8f0)',
+                            overflow: 'hidden',
+                            background: 'var(--surface, #fff)',
                           }}
                         >
-                          <div
+                          <summary
                             style={{
-                              fontWeight: 600,
-                              fontSize: '0.85rem',
-                              color: 'var(--ink, #1e293b)',
+                              padding: '12px 16px',
+                              cursor: 'pointer',
                               display: 'flex',
+                              justifyContent: 'space-between',
                               alignItems: 'center',
-                              gap: '0.4rem',
+                              listStyle: 'none',
+                              userSelect: 'none',
+                              gap: 10,
                             }}
                           >
-                            <FileText size={14} style={{ color: '#6366f1', flexShrink: 0 }} />
-                            <span style={{ flex: 1 }}>{doc.name || doc.description || 'Document'}</span>
-                            {doc.fileData && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                              <FileText size={16} style={{ color: '#6366f1', flexShrink: 0 }} />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--ink, #1e293b)' }}>
+                                  {doc.name || doc.description || 'Document'}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: 'var(--ink-soft, #64748b)', marginTop: 1 }}>
+                                  {doc.issuer}{doc.date ? ` · ${doc.date}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                              {doc.fileData ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    try {
+                                      const mime = doc.fileMimeType || 'application/pdf';
+                                      const byteChars = atob(doc.fileData);
+                                      const byteArray = new Uint8Array(byteChars.length);
+                                      for (let j = 0; j < byteChars.length; j++) byteArray[j] = byteChars.charCodeAt(j);
+                                      const blob = new Blob([byteArray], { type: mime });
+                                      const url = URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = `${(doc.name || 'document').replace(/[^a-zA-Z0-9 ]/g, '_')}_original.pdf`;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      document.body.removeChild(a);
+                                      URL.revokeObjectURL(url);
+                                    } catch (err) {
+                                      console.error('Download error:', err);
+                                    }
+                                  }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                                    borderRadius: 6, border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)',
+                                    color: '#10b981', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700,
+                                  }}
+                                >
+                                  <Download size={12} /> Original
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    refetchDocument(
+                                      digiModal.candidateId || digiModal.id,
+                                      idx,
+                                      doc.name || doc.description || 'Document'
+                                    );
+                                  }}
+                                  disabled={refetchingDocs[`${digiModal.candidateId || digiModal.id}-${idx}`]}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                                    borderRadius: 6, border: '1px solid #d97706', background: 'rgba(217,119,6,0.1)',
+                                    color: '#d97706', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700,
+                                    opacity: refetchingDocs[`${digiModal.candidateId || digiModal.id}-${idx}`] ? 0.6 : 1,
+                                  }}
+                                >
+                                  <Download size={12} /> {refetchingDocs[`${digiModal.candidateId || digiModal.id}-${idx}`] ? 'Fetching...' : 'Fetch Original'}
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  try {
-                                    const mime = doc.fileMimeType || 'application/pdf';
-                                    const byteChars = atob(doc.fileData);
-                                    const byteArray = new Uint8Array(byteChars.length);
-                                    for (let i = 0; i < byteChars.length; i++) {
-                                      byteArray[i] = byteChars.charCodeAt(i);
-                                    }
-                                    const blob = new Blob([byteArray], { type: mime });
-                                    const url = URL.createObjectURL(blob);
-                                    const ext = mime.includes('pdf') ? 'pdf' : mime.includes('xml') ? 'xml' : 'bin';
-                                    const fileName = `${(doc.name || doc.doctype || 'document').replace(/[^a-zA-Z0-9 ]/g, '_')}.${ext}`;
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = fileName;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                  } catch (err) {
-                                    console.error('Download error:', err);
-                                  }
+                                  e.preventDefault();
+                                  generateCertificatePdf(doc);
                                 }}
-                                title="Download document"
                                 style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.3rem',
-                                  padding: '0.25rem 0.6rem',
-                                  borderRadius: '6px',
-                                  border: '1px solid #86efac',
-                                  background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
-                                  color: '#065f46',
-                                  cursor: 'pointer',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 700,
-                                  flexShrink: 0,
-                                  transition: 'all 0.15s',
+                                  display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                                  borderRadius: 6, border: '1px solid #6366f1', background: 'rgba(99,102,241,0.1)',
+                                  color: '#6366f1', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700,
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'linear-gradient(135deg, #d1fae5, #a7f3d0)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = 'linear-gradient(135deg, #ecfdf5, #d1fae5)'; }}
                               >
-                                <Download size={12} />
-                                Download
+                                <Download size={12} /> Certificate
                               </button>
+                              {doc.doctype && (
+                                <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '3px 10px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderRadius: 8 }}>
+                                  {doc.doctype}
+                                </span>
+                              )}
+                              <ChevronDown size={14} style={{ color: '#94a3b8' }} />
+                            </div>
+                          </summary>
+                          <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border-color, #e2e8f0)' }}>
+                            {doc.certificateData ? (
+                              <div style={{ marginTop: 12 }}>
+                                {renderCertFields(doc.certificateData)}
+                              </div>
+                            ) : (
+                              <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', margin: '12px 0 0' }}>
+                                No certificate details available. Re-verify DigiLocker to fetch document data.
+                              </p>
                             )}
                           </div>
-                          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                            {doc.doctype && (
-                              <span
-                                style={{
-                                  fontSize: '0.72rem',
-                                  padding: '0.1rem 0.45rem',
-                                  borderRadius: '4px',
-                                  background: '#eff6ff',
-                                  border: '1px solid #bfdbfe',
-                                  color: '#1e40af',
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {doc.doctype}
-                              </span>
-                            )}
-                            {doc.issuer && (
-                              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                                {doc.issuer}
-                              </span>
-                            )}
-                            {doc.date && (
-                              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                                {doc.date}
-                              </span>
-                            )}
-                            {!doc.fileData && (
-                              <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                No file available
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                        </details>
                       ))}
                     </div>
                   </div>

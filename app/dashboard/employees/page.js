@@ -7,14 +7,46 @@ import { useTheme } from '../layout';
 const formatDob = (dob) => {
   if (!dob) return '';
   const dobStr = dob.toString().trim();
-  // Check if DDMMYYYY
+  // Check if 8 digits: DDMMYYYY or YYYYMMDD
   if (/^\d{8}$/.test(dobStr)) {
+    const yearEnd = parseInt(dobStr.substring(4, 8), 10);
+    const yearStart = parseInt(dobStr.substring(0, 4), 10);
+    if (yearEnd >= 1900 && yearEnd <= 2100) {
+      const val1 = parseInt(dobStr.substring(0, 2), 10);
+      const val2 = parseInt(dobStr.substring(2, 4), 10);
+      let day = val1;
+      let month = val2;
+      if (val1 <= 12 && val2 > 12) {
+        day = val2;
+        month = val1;
+      }
+      return `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${yearEnd}`;
+    } else if (yearStart >= 1900 && yearStart <= 2100) {
+      const val1 = parseInt(dobStr.substring(4, 6), 10);
+      const val2 = parseInt(dobStr.substring(6, 8), 10);
+      let month = val1;
+      let day = val2;
+      if (val1 > 12 && val2 <= 12) {
+        day = val1;
+        month = val2;
+      }
+      return `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${yearStart}`;
+    }
     return `${dobStr.substring(0, 2)}-${dobStr.substring(2, 4)}-${dobStr.substring(4, 8)}`;
   }
   // Check if YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(dobStr)) {
     const parts = dobStr.split('-');
     return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  // Check if MM-DD-YYYY where day > 12
+  if (/^\d{2}-\d{2}-\d{4}$/.test(dobStr)) {
+    const parts = dobStr.split('-');
+    const val1 = parseInt(parts[0], 10);
+    const val2 = parseInt(parts[1], 10);
+    if (val1 <= 12 && val2 > 12) {
+      return `${parts[1]}-${parts[0]}-${parts[2]}`;
+    }
   }
   return dobStr;
 };
@@ -1266,10 +1298,15 @@ export default function EmployeesPage() {
                                         let personGender = '';
                                         let personRegnNo = '';
                                         let personAbcId = '';
+                                        let personFather = '';
+                                        let personMother = '';
+                                        let personPhoto = '';
                                         let certDataRows = '';
                                         let subjectsHtml = '';
                                         let courseHtml = '';
                                         let examHtml = '';
+                                        let schoolHtml = '';
+                                        let perfHtml = '';
                                         let qrBase64 = '';
 
                                         const rawXml = doc.certificateData?.rawXml || '';
@@ -1294,6 +1331,34 @@ export default function EmployeesPage() {
                                               personGender = person.getAttribute('gender') || '';
                                               personRegnNo = person.getAttribute('regnNo') || person.getAttribute('rroll') || '';
                                               personAbcId = person.getAttribute('abcAccountId') || '';
+                                              personFather = person.getAttribute('fatherName') || person.getAttribute('swd') || '';
+                                              personMother = person.getAttribute('motherName') || '';
+                                              const photoEl = person.querySelector('Photo');
+                                              if (photoEl && photoEl.textContent) {
+                                                personPhoto = photoEl.textContent.trim();
+                                              }
+                                            }
+                                            // School / Institution info
+                                            const schoolEl = xmlDoc.querySelector('School');
+                                            if (schoolEl) {
+                                              const sn = schoolEl.getAttribute('name') || '';
+                                              const sc = schoolEl.getAttribute('code') || '';
+                                              if (sn) {
+                                                schoolHtml = `<div class="section"><div class="section-head">Institution / School</div><div class="info-grid"><div class="info-card" style="grid-column:1/-1"><div class="lbl">School Name</div><div class="val">${sn}${sc ? ` (Code: ${sc})` : ''}</div></div></div></div>`;
+                                              }
+                                            }
+                                            // Performance summary
+                                            const perfEl = xmlDoc.querySelector('Performance');
+                                            if (perfEl) {
+                                              const res = perfEl.getAttribute('result') || '';
+                                              const tot = perfEl.getAttribute('marksTotal') || '';
+                                              const max = perfEl.getAttribute('marksMax') || '';
+                                              if (res || tot) {
+                                                perfHtml = `<div class="section"><div class="section-head">Performance Summary</div><div class="info-grid">`;
+                                                if (res) perfHtml += `<div class="info-card"><div class="lbl">Result</div><div class="val" style="color:#16a34a;font-weight:700">${res}</div></div>`;
+                                                if (tot) perfHtml += `<div class="info-card"><div class="lbl">Total Marks</div><div class="val" style="font-weight:700">${tot}${max ? ` / ${max}` : ''}</div></div>`;
+                                                perfHtml += `</div></div>`;
+                                              }
                                             }
                                             // Course info
                                             const courseEl = xmlDoc.querySelector('Course');
@@ -1325,17 +1390,33 @@ export default function EmployeesPage() {
                                             // Subjects table
                                             const subjects = xmlDoc.querySelectorAll('Subject');
                                             if (subjects.length > 0) {
-                                              subjectsHtml = `<div class="section"><div class="section-head">Subjects &amp; Grades</div><table class="subjects"><thead><tr><th>Code</th><th>Subject</th><th>Grade</th><th>GP</th><th>Max</th></tr></thead><tbody>`;
-                                              subjects.forEach(sub => {
-                                                const code = sub.getAttribute('code') || '';
-                                                const nm = sub.getAttribute('name') || '';
-                                                const grade = sub.getAttribute('grade') || '';
-                                                const gp = sub.getAttribute('gp') || '';
-                                                const mm = sub.getAttribute('marksMax') || '';
-                                                const gc = grade === 'O' ? '#16a34a' : grade === 'A+' ? '#2563eb' : grade === 'A' ? '#7c3aed' : '#1e293b';
-                                                subjectsHtml += `<tr><td style="font-family:monospace;font-size:11px;color:#64748b">${code}</td><td>${nm}</td><td style="text-align:center"><span style="background:${gc}11;color:${gc};padding:2px 10px;border-radius:6px;font-weight:700;font-size:12px">${grade}</span></td><td style="text-align:center;font-weight:700">${gp}</td><td style="text-align:center">${mm}</td></tr>`;
-                                              });
-                                              subjectsHtml += `</tbody></table></div>`;
+                                              const hasMarks = Array.from(subjects).some(s => s.getAttribute('marksTotal') || s.getAttribute('marksTheory'));
+                                              if (hasMarks) {
+                                                subjectsHtml = `<div class="section"><div class="section-head">Subjects &amp; Marks</div><table class="subjects"><thead><tr><th>Code</th><th>Subject</th><th style="text-align:center">Theory</th><th style="text-align:center">Practical</th><th style="text-align:center">Total</th><th style="text-align:center">Grade</th></tr></thead><tbody>`;
+                                                subjects.forEach(sub => {
+                                                  const code = sub.getAttribute('code') || '';
+                                                  const nm = sub.getAttribute('name') || '';
+                                                  const th = sub.getAttribute('marksTheory') || '-';
+                                                  const pr = sub.getAttribute('marksPractical') || '-';
+                                                  const tot = sub.getAttribute('marksTotal') || '-';
+                                                  const grade = sub.getAttribute('grade') || '';
+                                                  const gc = grade.startsWith('A') ? '#16a34a' : grade.startsWith('B') ? '#2563eb' : '#1e293b';
+                                                  subjectsHtml += `<tr><td style="font-family:monospace;font-size:11px;color:#64748b">${code}</td><td>${nm}</td><td style="text-align:center">${th}</td><td style="text-align:center">${pr}</td><td style="text-align:center;font-weight:700">${tot}</td><td style="text-align:center"><span style="background:${gc}15;color:${gc};padding:2px 10px;border-radius:6px;font-weight:700;font-size:12px">${grade}</span></td></tr>`;
+                                                });
+                                                subjectsHtml += `</tbody></table></div>`;
+                                              } else {
+                                                subjectsHtml = `<div class="section"><div class="section-head">Subjects &amp; Grades</div><table class="subjects"><thead><tr><th>Code</th><th>Subject</th><th>Grade</th><th>GP</th><th>Max</th></tr></thead><tbody>`;
+                                                subjects.forEach(sub => {
+                                                  const code = sub.getAttribute('code') || '';
+                                                  const nm = sub.getAttribute('name') || '';
+                                                  const grade = sub.getAttribute('grade') || '';
+                                                  const gp = sub.getAttribute('gp') || '';
+                                                  const mm = sub.getAttribute('marksMax') || '';
+                                                  const gc = grade === 'O' ? '#16a34a' : grade === 'A+' ? '#2563eb' : grade === 'A' ? '#7c3aed' : '#1e293b';
+                                                  subjectsHtml += `<tr><td style="font-family:monospace;font-size:11px;color:#64748b">${code}</td><td>${nm}</td><td style="text-align:center"><span style="background:${gc}11;color:${gc};padding:2px 10px;border-radius:6px;font-weight:700;font-size:12px">${grade}</span></td><td style="text-align:center;font-weight:700">${gp}</td><td style="text-align:center">${mm}</td></tr>`;
+                                                });
+                                                subjectsHtml += `</tbody></table></div>`;
+                                              }
                                             }
                                             const certDataEl = xmlDoc.querySelector('CertificateData');
                                             if (certDataEl && !xmlDoc.querySelector('Subject')) {
@@ -1343,7 +1424,7 @@ export default function EmployeesPage() {
                                               for (let ci = 0; ci < children.length; ci++) {
                                                 const child = children[ci];
                                                 const tagName = child.tagName;
-                                                if (['OrgDetails','Examination','Course','Performance'].includes(tagName)) continue;
+                                                if (['OrgDetails','Examination','Course','Performance','School'].includes(tagName)) continue;
                                                 const attrs = child.attributes;
                                                 for (let ai = 0; ai < attrs.length; ai++) {
                                                   const a = attrs[ai];
@@ -1410,13 +1491,18 @@ export default function EmployeesPage() {
 
                                           ${personName ? `<div class="section">
                                             <div class="section-head">Certificate Holder</div>
-                                            <div class="info-grid">
-                                              <div class="info-card"><div class="lbl">Full Name</div><div class="val">${personName}</div></div>
-                                              ${personDob ? `<div class="info-card"><div class="lbl">Date of Birth</div><div class="val">${personDob}</div></div>` : ''}
-                                              ${personGender ? `<div class="info-card"><div class="lbl">Gender</div><div class="val">${personGender}</div></div>` : ''}
-                                              ${personRegnNo ? `<div class="info-card"><div class="lbl">Registration No</div><div class="val">${personRegnNo}</div></div>` : ''}
-                                              ${certNumber && certNumber !== personRegnNo ? `<div class="info-card"><div class="lbl">Document Number</div><div class="val">${certNumber}</div></div>` : ''}
-                                              ${personAbcId ? `<div class="info-card"><div class="lbl">ABC Account ID</div><div class="val">${personAbcId}</div></div>` : ''}
+                                            <div style="display:flex;gap:20px;align-items:flex-start">
+                                              ${personPhoto ? `<div style="width:90px;height:115px;border-radius:8px;overflow:hidden;border:1px solid #cbd5e1;flex-shrink:0"><img src="${personPhoto.startsWith('data:') ? personPhoto : `data:image/jpeg;base64,${personPhoto}`}" style="width:100%;height:100%;object-fit:cover" alt="Photo"/></div>` : ''}
+                                              <div class="info-grid" style="flex:1">
+                                                <div class="info-card"><div class="lbl">Full Name</div><div class="val">${personName}</div></div>
+                                                ${personDob ? `<div class="info-card"><div class="lbl">Date of Birth</div><div class="val">${personDob}</div></div>` : ''}
+                                                ${personGender ? `<div class="info-card"><div class="lbl">Gender</div><div class="val">${personGender}</div></div>` : ''}
+                                                ${personFather ? `<div class="info-card"><div class="lbl">Father's Name</div><div class="val">${personFather}</div></div>` : ''}
+                                                ${personMother ? `<div class="info-card"><div class="lbl">Mother's Name</div><div class="val">${personMother}</div></div>` : ''}
+                                                ${personRegnNo ? `<div class="info-card"><div class="lbl">Registration / Roll No</div><div class="val">${personRegnNo}</div></div>` : ''}
+                                                ${certNumber && certNumber !== personRegnNo ? `<div class="info-card"><div class="lbl">Document Number</div><div class="val">${certNumber}</div></div>` : ''}
+                                                ${personAbcId ? `<div class="info-card"><div class="lbl">ABC Account ID</div><div class="val">${personAbcId}</div></div>` : ''}
+                                              </div>
                                             </div>
                                           </div>` : ''}
 
@@ -1430,8 +1516,10 @@ export default function EmployeesPage() {
                                             </div>
                                           </div>
 
+                                          ${schoolHtml}
                                           ${courseHtml}
                                           ${examHtml}
+                                          ${perfHtml}
                                           ${subjectsHtml}
 
                                           ${certDataRows ? `<div class="section">

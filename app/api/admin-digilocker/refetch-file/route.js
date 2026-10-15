@@ -44,13 +44,31 @@ export async function POST(request) {
     }
 
     const db = await getDb();
-    const user = await db.collection('users').findOne(
-      { id: employeeId },
+    const { ObjectId } = await import('mongodb');
+
+    let userQuery = { id: employeeId };
+    try {
+      if (ObjectId.isValid(employeeId)) {
+        userQuery = { $or: [{ id: employeeId }, { _id: new ObjectId(employeeId) }, { _id: employeeId }] };
+      }
+    } catch (e) {}
+
+    let user = await db.collection('users').findOne(
+      userQuery,
       { projection: { 'digilockerProfile.dlAccessToken': 1, 'digilockerProfile.documents': 1 } }
     );
+    let targetCol = 'users';
 
     if (!user || !user.digilockerProfile) {
-      return NextResponse.json({ error: 'User has no DigiLocker profile' }, { status: 404 });
+      user = await db.collection('candidates').findOne(
+        userQuery,
+        { projection: { 'digilockerProfile.dlAccessToken': 1, 'digilockerProfile.documents': 1 } }
+      );
+      targetCol = 'candidates';
+    }
+
+    if (!user || !user.digilockerProfile) {
+      return NextResponse.json({ error: 'User/Candidate has no DigiLocker profile' }, { status: 404 });
     }
 
     const accessToken = user.digilockerProfile.dlAccessToken;
@@ -60,8 +78,8 @@ export async function POST(request) {
 
     if (!accessToken) {
       // No token saved — flag for re-verification with specific document info
-      await db.collection('users').updateOne(
-        { id: employeeId },
+      await db.collection(targetCol).updateOne(
+        userQuery,
         {
           $set: {
             'digilockerProfile.reverifyRequested': true,
@@ -111,8 +129,8 @@ export async function POST(request) {
 
       // If token expired, flag the user for re-verification with specific doc
       if (tokenExpired) {
-        await db.collection('users').updateOne(
-          { id: employeeId },
+        await db.collection(targetCol).updateOne(
+          userQuery,
           {
             $set: {
               'digilockerProfile.reverifyRequested': true,
@@ -145,8 +163,8 @@ export async function POST(request) {
     }
 
     // Update just this document's fileData in MongoDB
-    await db.collection('users').updateOne(
-      { id: employeeId },
+    await db.collection(targetCol).updateOne(
+      userQuery,
       {
         $set: {
           [`digilockerProfile.documents.${docIndex}.fileData`]: base64,
